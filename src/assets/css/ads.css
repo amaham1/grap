@@ -1,0 +1,29 @@
+/* assets/css/ads.css */
+.ad-sidebar {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 160px;
+  z-index: 1000;
+}
+
+.ad-sidebar.left {
+  left: 10px;
+}
+
+.ad-sidebar.right {
+  right: 10px;
+}
+
+.main-content {
+  margin: 0 200px; /* 광고 영역 확보 */
+}
+
+@media (max-width: 768px) {
+  .ad-sidebar {
+    display: none;
+  }
+  .main-content {
+    margin: 0 !important;
+  }
+}
