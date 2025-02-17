@@ -27,7 +27,7 @@
             <span class="amount">{{ formatAmount(deal.dealAmount) }}만원</span>
           </div>
           <div v-if="hoveredDeal === deal" class="deal-date">
-            거래일: {{ formatDate(deal) }}
+            거래일: {{ formatDealDate(deal) }}
           </div>
         </div>
       </div>
@@ -39,20 +39,19 @@
 import { ref, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { realEstateApi } from '@/api/realEstateApi';
+import { formatAmount } from '@/utils/formatters';
+import { formatDate, formatDealDate } from '@/utils/dateUtils';
 
 const router = useRouter();
 const props = defineProps({
   selectedDate: String // YYYY-MM 형식
 });
 
-const formatAmount = (amount) => {
-  return amount ? amount.toLocaleString() : '0';
-};
+const hoveredDeal = ref(null);
 
 const formattedDate = computed(() => {
   if (!props.selectedDate) return '';
-  const [year, month] = props.selectedDate.split('-');
-  return `${year}년 ${month}월`;
+  return formatDate(props.selectedDate);
 });
 
 const navigateToDetail = (estate) => {
@@ -76,6 +75,7 @@ watch(() => props.selectedDate, async (newDate) => {
 
 <style scoped>
 .top-deals {
+  margin-top: 20px;
   background: white;
   border-radius: 12px;
   padding: 20px;
@@ -153,7 +153,7 @@ h3 {
 }
 
 .amount {
-  color: #e74c3c;
+  color: #4c74a6;
   font-weight: bold;
 }
 

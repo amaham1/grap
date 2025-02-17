@@ -1,5 +1,5 @@
 // 실제 API 통신을 위한 기본 설정
-const BASE_URL = 'http://akapwhdgrap.cafe24.com/api';
+const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 // API 호출 시 공통으로 사용할 에러 처리 함수
 const handleApiError = (error) => {
@@ -128,15 +128,17 @@ export const realEstateApi = {
     searchKey = ''
   }) {
     try {
+      const offset = itemNum * itemSizePerPage;
+      
       // 유효한 값만 포함하는 객체 생성
       const validParams = {
-        itemNum: itemNum.toString(),
+        itemNum: offset.toString(),
         itemSizePerPage: itemSizePerPage.toString()
       };
 
       // 선택적 파라미터들은 값이 있을 때만 추가
       if (searchQuery?.trim()) {
-        validParams.searchType = 'apt_nm';
+        validParams.searchType = searchType || 'apt_nm';
         validParams.searchKey = searchQuery.trim();
       }
 
@@ -144,8 +146,20 @@ export const realEstateApi = {
       if (searchKey?.trim()) validParams.searchKey = searchKey.trim();
       if (umdNm) validParams.umdNm = umdNm;
       if (location?.trim()) validParams.location = location.trim();
-      if (startDate?.trim()) validParams.startDate = startDate.trim();
-      if (endDate?.trim()) validParams.endDate = endDate.trim();
+      
+      // 날짜 파라미터 처리
+      if (startDate?.trim()) {
+        const [year, month] = startDate.trim().split('-');
+        validParams.startDealYear = year;
+        validParams.startDealMonth = month;
+      }
+      
+      if (endDate?.trim()) {
+        const [year, month] = endDate.trim().split('-');
+        validParams.endDealYear = year;
+        validParams.endDealMonth = month;
+      }
+      
       if (sortType?.trim()) validParams.sortType = sortType.trim();
       if (sortOrder?.trim()) validParams.sortOrder = sortOrder.trim();
 
@@ -206,6 +220,7 @@ export const realEstateApi = {
   async fetchTopDealsByAmount(dealDate) {
     try {
       const url = new URL(`${BASE_URL}/real-estate/top-monthly-real-estate`);
+      console.log(url)
       url.searchParams.append('dealDate', dealDate); // YYYY-MM 형식
       
       const response = await fetch(url);

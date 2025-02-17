@@ -12,7 +12,12 @@
         반경 1km 내 초등학교: {{ schoolCount }}개
       </div>
       <div v-if="showDetail && schools.length > 0" class="school-list">
-        <div v-for="school in schools" :key="school.name" class="school-item">
+        <div 
+          v-for="school in schools" 
+          :key="school.name" 
+          class="school-item"
+          @click="handleMapClick(school)"
+        >
           <div class="school-name">{{ school.name }}</div>
           <div class="school-distance">{{ formatDistance(school.distance) }}</div>
         </div>
@@ -31,6 +36,8 @@
 <script setup>
 import { ref, onMounted, watchEffect } from 'vue';
 import { searchNearbySchools } from '@/api/kakaoMapApi';
+import { openKakaoMap } from '@/utils/kakaoMap';
+import { formatDistance } from '@/utils/formatters';
 
 const props = defineProps({
   latitude: {
@@ -51,8 +58,8 @@ const isLoading = ref(false);
 const error = ref(null);
 const showDetail = ref(false);
 
-const formatDistance = (meters) => {
-  return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
+const handleMapClick = (school) => {
+  openKakaoMap(school.name);
 };
 
 const fetchSchoolInfo = async () => {
@@ -113,9 +120,15 @@ watchEffect(() => {
   justify-content: space-between;
   align-items: center;
   padding: 8px;
-  background: white;
+  margin-bottom: 8px;
+  background-color: white;
   border-radius: 4px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.school-item:hover {
+  background-color: #f0f0f0;
 }
 
 .school-name {

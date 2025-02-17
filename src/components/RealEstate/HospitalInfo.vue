@@ -12,7 +12,12 @@
         반경 1km 내 병원: {{ hospitalCount }}개
       </div>
       <div v-if="showDetail && hospitals.length > 0" class="hospital-list">
-        <div v-for="hospital in hospitals" :key="hospital.id" class="hospital-item">
+        <div 
+          v-for="hospital in hospitals" 
+          :key="hospital.id" 
+          class="hospital-item"
+          @click="handleMapClick(hospital)"
+        >
           <div class="hospital-name">{{ hospital.place_name }}</div>
           <div class="hospital-distance">{{ formatDistance(hospital.distance) }}</div>
         </div>
@@ -31,6 +36,8 @@
 <script setup>
 import { ref, onMounted, watchEffect } from 'vue';
 import { searchNearbyHospitals } from '@/api/kakaoMapApi';
+import { openKakaoMap } from '@/utils/kakaoMap';
+import { formatDistance } from '@/utils/formatters';
 
 const props = defineProps({
   latitude: {
@@ -51,8 +58,8 @@ const isLoading = ref(false);
 const error = ref(null);
 const showDetail = ref(false);
 
-const formatDistance = (meters) => {
-  return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
+const handleMapClick = (hospital) => {
+  openKakaoMap(hospital.place_name);
 };
 
 const fetchHospitalInfo = async () => {
@@ -139,12 +146,20 @@ watchEffect(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem;
-  border-bottom: 1px solid #eee;
+  padding: 8px;
+  margin-bottom: 8px;
+  background-color: white;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.hospital-item:hover {
+  background-color: #f0f0f0;
 }
 
 .hospital-item:last-child {
-  border-bottom: none;
+  margin-bottom: 0;
 }
 
 .hospital-name {

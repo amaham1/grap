@@ -160,7 +160,7 @@ onMounted(() => {
 .detail-button {
   display: inline-block;
   padding: 6px 12px;
-  background-color: #3498db;
+  background-color: #4c74a6;
   color: white;
   text-decoration: none;
   border-radius: 4px;

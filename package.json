@@ -4,15 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
+    "dev": "cross-env NODE_ENV=development vite",
+    "build": "cross-env NODE_ENV=production vite build",
     "preview": "vite preview",
-    "test:unit": "vitest",
-    "start": "node ./web.js"
+    "test:unit": "vitest"
   },
   "dependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.7.2",
+    "@fortawesome/free-regular-svg-icons": "^6.7.2",
+    "@fortawesome/free-solid-svg-icons": "^6.7.2",
+    "@fortawesome/vue-fontawesome": "^3.0.8",
     "chart.js": "^4.4.7",
-    "express": "^4.21.2",
+    "dotenv": "^16.4.7",
+    "lodash": "^4.17.21",
     "pinia": "^2.3.0",
     "vue": "^3.5.13",
     "vue-router": "^4.5.0"
@@ -20,6 +24,7 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.1",
     "@vue/test-utils": "^2.4.6",
+    "cross-env": "^7.0.3",
     "jsdom": "^25.0.1",
     "vite": "^6.0.5",
     "vite-plugin-vue-devtools": "^7.6.8",

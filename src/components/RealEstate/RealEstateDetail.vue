@@ -33,8 +33,8 @@
             <span class="value">{{ formatDate(property.dealYear, property.dealMonth, property.dealDay) }}</span>
           </div>
           <div class="info-item">
-            <span class="label">지역</span>
-            <span class="value">{{ property.umdNm }}</span>
+            <span class="label">지역(도로명)</span>
+            <span class="value">{{ property.umdNm }} ({{ property.roadNm }})</span>
           </div>
         </div>
       </section>

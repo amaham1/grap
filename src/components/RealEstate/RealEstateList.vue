@@ -9,10 +9,17 @@
         />
         <div class="search-container">
           <div class="search-box">
+            <select 
+              v-model="selectedSearchType"
+              class="search-type-select"
+            >
+              <option value="apt_nm">아파트 이름</option>
+              <option value="road_nm">도로명 이름</option>
+            </select>
             <input 
               type="text" 
               v-model="searchQuery" 
-              placeholder="아파트 이름으로 검색"
+              :placeholder="selectedSearchType === 'apt_nm' ? '아파트 이름으로 검색' : '도로명으로 검색'"
               @keyup.enter="handleSearch"
             >
             <button 
@@ -151,6 +158,7 @@ const searchQuery = ref('');
 const selectedUmdNm = ref('');
 const sortType = ref('');
 const sortOrder = ref('');
+const selectedSearchType = ref('apt_nm');
 
 const umdNms = ref([]);
 
@@ -228,15 +236,19 @@ const fetchRealEstates = async () => {
     isLoading.value = true;
     error.value = null;
     
+    const startDate = selectedYear.value 
+      ? `${selectedYear.value}-${selectedMonth.value ? String(selectedMonth.value).padStart(2, '0') : '01'}`
+      : '';
+    const endDate = selectedYear.value 
+      ? `${selectedYear.value}-${selectedMonth.value ? String(selectedMonth.value).padStart(2, '0') : '12'}`
+      : '';
+
     const response = await realEstateApi.fetchRealEstates({
       searchQuery: searchQuery.value,
+      searchType: selectedSearchType.value,
       umdNm: selectedUmdNm.value,
-      startDate: selectedYear.value && selectedMonth.value
-        ? `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`
-        : '',
-      endDate: selectedYear.value && selectedMonth.value
-        ? `${selectedYear.value}-${String(selectedMonth.value).padStart(2, '0')}`
-        : '',
+      startDate,
+      endDate,
       sortType: sortType.value,
       sortOrder: sortOrder.value,
       itemNum: currentPage.value,
@@ -245,8 +257,6 @@ const fetchRealEstates = async () => {
 
     // 데이터 없을 경우 날짜 자동 조정
     adjustDateIfNoData(response);
-    
-    console.log('API Response in component:', response);
     
     // 응답이 없거나 realEstates 배열이 없는 경우 기본값 설정
     realEstates.value = response?.realEstates || [];
@@ -284,6 +294,10 @@ const handleSearch = () => {
     return;
   }
   
+  // 년/월 선택 초기화
+  selectedYear.value = '';
+  selectedMonth.value = '';
+  
   // 페이지 초기화
   currentPage.value = 0;
   fetchRealEstates();
@@ -294,10 +308,21 @@ const handleFilterChange = () => {
   fetchRealEstates();
 };
 
-// searchQuery를 제외한 필터들의 변경사항만 감시
-watch([selectedUmdNm, selectedYear, selectedMonth, sortType, sortOrder], () => {
+watch(selectedYear, (newValue) => {
+  if (newValue) {
+    handleFilterChange();
+  }
+});
+
+watch(selectedMonth, (newValue) => {
+  if (selectedYear.value) {
+    handleFilterChange();
+  }
+});
+
+watch([selectedUmdNm, sortType, sortOrder, selectedSearchType], () => {
   handleFilterChange();
-}, { deep: true });
+});
 
 onMounted(async () => {
   await fetchRealEstates();
@@ -306,9 +331,7 @@ onMounted(async () => {
 
 <style scoped>
 .real-estate-list {
-  max-width: 1200px;
   margin: 0 auto;
-  padding: 20px;
 }
 
 .search-container {
@@ -318,7 +341,15 @@ onMounted(async () => {
 .search-box {
   display: flex;
   gap: 10px;
-  margin-bottom: 1rem;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.search-type-select {
+  padding: 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  background-color: white;
 }
 
 .search-box input {
@@ -330,16 +361,15 @@ onMounted(async () => {
 
 .search-button {
   padding: 8px 16px;
-  background-color: #007bff;
+  background-color: #4c74a6;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.2s;
 }
 
 .search-button:hover {
-  background-color: #0056b3;
+  background-color: #2980b9;
 }
 
 .filter-container {
@@ -375,6 +405,7 @@ onMounted(async () => {
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 20px;
   margin-top: 20px;
+  margin-bottom: 50px;
 }
 
 .pagination-info {

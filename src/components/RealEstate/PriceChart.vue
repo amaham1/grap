@@ -9,6 +9,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import Chart from 'chart.js/auto';
+import { formatDate } from '@/utils/dateUtils';
 
 const props = defineProps({
   priceData: {
@@ -19,11 +20,6 @@ const props = defineProps({
 
 const chartCanvas = ref(null);
 let chart = null;
-
-const formatDate = (dateString) => {
-  const date = new Date(dateString);
-  return `${date.getFullYear()}년 ${date.getMonth() + 1}월`;
-};
 
 const createChart = () => {
   if (!chartCanvas.value) return;
@@ -50,24 +46,19 @@ const createChart = () => {
 
   // 월별 평균 계산
   const monthlyAverages = Object.entries(monthlyData).map(([month, data]) => ({
-    month,
-    average: Math.round(data.sum / data.count)
-  }));
-
-  // 날짜순 정렬
-  monthlyAverages.sort((a, b) => a.month.localeCompare(b.month));
+    date: month,
+    avgPrice: data.sum / data.count
+  })).sort((a, b) => a.date.localeCompare(b.date));
 
   chart = new Chart(ctx, {
     type: 'line',
     data: {
-      labels: monthlyAverages.map(item => formatDate(item.month)),
+      labels: monthlyAverages.map(item => formatDate(item.date)),
       datasets: [{
-        label: '평균 거래가(만원)',
-        data: monthlyAverages.map(item => item.average),
-        borderColor: '#3498db',
-        backgroundColor: 'rgba(52, 152, 219, 0.1)',
-        tension: 0.4,
-        fill: true
+        label: '평균 거래가',
+        data: monthlyAverages.map(item => item.avgPrice),
+        borderColor: '#4c74a6',
+        tension: 0.1
       }]
     },
     options: {
@@ -75,23 +66,13 @@ const createChart = () => {
       maintainAspectRatio: false,
       plugins: {
         legend: {
-          position: 'top',
-        },
-        title: {
           display: true,
-          text: '월별 평균 시세'
-        },
-        tooltip: {
-          callbacks: {
-            label: function(context) {
-              return `${context.dataset.label}: ${context.parsed.y.toLocaleString()}만원`;
-            }
-          }
+          position: 'top'
         }
       },
       scales: {
         y: {
-          beginAtZero: false,
+          beginAtZero: true,
           ticks: {
             callback: function(value) {
               return value.toLocaleString() + '만원';
