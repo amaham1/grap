@@ -16,10 +16,11 @@
           @mouseleave="showDropdown = false"
         >
           <router-link to="/" class="nav-item">부동산 매매 정보</router-link>
-          <div v-if="showDropdown" class="dropdown-menu">
+          <router-link to="/compare" class="nav-item">부동산 매매 비교</router-link>
+          <!-- <div v-if="showDropdown" class="dropdown-menu">
             <router-link to="/" class="dropdown-item">부동산 매매 정보</router-link>
             <router-link to="/compare" class="dropdown-item">부동산 매매 비교</router-link>
-          </div>
+          </div> -->
         </div>
       </nav>
 
