@@ -144,7 +144,7 @@ import { ref, onMounted, computed, watch } from 'vue';
 import RealEstateCard from './RealEstateCard.vue';
 import TopDeals from './TopDeals.vue';
 import { realEstateApi } from '@/api/realEstateApi';
-import { formatDate, getPreviousMonth } from '@/utils/dateUtils';
+import { formatDate, getPreviousMonth } from '@/modules/real-estate/utils/dateUtils';
 
 const realEstates = ref([]);
 const isLoading = ref(false);

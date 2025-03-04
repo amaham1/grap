@@ -1,30 +1,19 @@
-import { createRouter, createWebHistory } from 'vue-router';
-import RealEstateList from '@/components/RealEstate/RealEstateList.vue';
-import RealEstateDetail from '@/components/RealEstate/RealEstateDetail.vue';
-import RealEstateCompare from '@/components/RealEstate/RealEstateCompare.vue';
+import { createRouter, createWebHistory } from 'vue-router'
+import realEstateRoutes from '@/modules/real-estate/router'
+import fuelRoutes from '@/modules/fuel/router'
+import HomeView from '@/views/HomeView.vue'
 
 const routes = [
   {
     path: '/',
-    name: 'RealEstateList',
-    component: RealEstateList
+    name: 'Home',
+    component: HomeView
   },
-  {
-    path: '/property/:id',
-    name: 'RealEstateDetail',
-    component: RealEstateDetail,
-    props: route => ({ propertyId: Number(route.params.id) })
-  },
-  {
-    path: '/compare',
-    name: 'RealEstateCompare',
-    component: RealEstateCompare
-  }
-];
+  realEstateRoutes,
+  fuelRoutes
+]
 
-const router = createRouter({
+export default createRouter({
   history: createWebHistory(),
   routes
 });
-
-export default router;

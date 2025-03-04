@@ -35,12 +35,15 @@ const initializeMap = async () => {
       return;
     }
 
+    
     // 지도 옵션 설정
     const options = {
       center: new window.kakao.maps.LatLng(props.latitude, props.longitude),
       level: 3
     };
 
+    console.log("real estate ", options);
+    
     // 새 지도 인스턴스 생성
     map.value = new window.kakao.maps.Map(container, options);
 

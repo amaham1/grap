@@ -83,8 +83,8 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue';
 import { realEstateApi } from '@/api/realEstateApi';
-import KakaoMap from '@/components/Map/KakaoMap.vue';
-import PriceChart from './PriceChart.vue';
+import KakaoMap from '@/modules/real-estate/components/Map/KakaoMap.vue';
+import PriceChart from '@/modules/real-estate/components/RealEstate/PriceChart.vue';
 
 const props = defineProps({
   propertyId: {

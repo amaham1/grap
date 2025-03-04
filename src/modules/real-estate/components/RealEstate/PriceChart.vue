@@ -9,7 +9,7 @@
 <script setup>
 import { ref, onMounted, watch } from 'vue';
 import Chart from 'chart.js/auto';
-import { formatDate } from '@/utils/dateUtils';
+import { formatDate } from '@/modules/real-estate/utils/dateUtils';
 
 const props = defineProps({
   priceData: {
