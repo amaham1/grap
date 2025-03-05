@@ -29,7 +29,7 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch } from 'vue';
+import { ref, onMounted, computed, watch, inject } from 'vue';
 import { getBrandName } from '@/modules/fuel/utils/brandUtils';
 import { getPriceColor, getPriceLevel, isLowestPrice } from '@/modules/fuel/utils/colorUtils';
 import { getCurrentLocation, formatDistance, calculateHaversineDistance } from '@/modules/fuel/api/kakaoMobilityService';
@@ -56,7 +56,7 @@ export default {
       default: null
     }
   },
-  emits: ['select-station'],
+  emits: ['select-station', 'show-infowindow'],
   setup(props, { emit }) {
     // 가격 포맷팅 함수
     const formatPrice = (price) => {
@@ -75,6 +75,7 @@ export default {
     // 카드 클릭 이벤트 핸들러
     const handleCardClick = () => {
       emit('select-station', props.station.UNI_ID);
+      emit('show-infowindow', props.station);
     };
     
     // 거리 계산 함수

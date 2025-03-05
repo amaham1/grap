@@ -79,11 +79,11 @@ const createMarkerImage = (station, allStations, index) => {
   
   // SVG 마커 생성 (최저가일 경우 별표 추가)
   const svgMarker = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="35" viewBox="0 0 24 35">
-      <path fill="${color}" d="M12 0C5.4 0 0 5.4 0 12c0 7.2 12 23 12 23s12-15.8 12-23c0-6.6-5.4-12-12-12z"/>
-      <circle fill="white" cx="12" cy="12" r="5"/>
+    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
+      <path fill="${color}" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
+      <circle fill="white" cx="18" cy="18" r="8"/>
       ${isLowestPriceStation ? `
-        <path fill="gold" d="M12 5.5l1.5 3 3.5 0.5-2.5 2.5 0.5 3.5-3-1.5-3 1.5 0.5-3.5-2.5-2.5 3.5-0.5z"/>
+        <path fill="gold" d="M18 8l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>
       ` : ''}
     </svg>
   `;
@@ -94,8 +94,8 @@ const createMarkerImage = (station, allStations, index) => {
   // 마커 이미지 생성
   return new window.kakao.maps.MarkerImage(
     'data:image/svg+xml;base64,' + encodedSvg,
-    new window.kakao.maps.Size(24, 35),
-    { offset: new window.kakao.maps.Point(12, 35) }
+    new window.kakao.maps.Size(36, 48),
+    { offset: new window.kakao.maps.Point(18, 48) }
   );
 };
 
@@ -117,8 +117,19 @@ const createMarkers = async () => {
     bounds.extend(new window.kakao.maps.LatLng(userLocation.latitude, userLocation.longitude));
   }
   
+  // 주유소 마커 생성 함수 호출
+  await createStationMarkers(props.fuelStations, bounds);
+  
+  // 모든 마커가 보이도록 지도 범위 조정
+  if (markers.value.length > 0) {
+    map.value.setBounds(bounds);
+  }
+};
+
+// 주유소 마커 생성 함수 (모듈화)
+const createStationMarkers = async (stations, bounds) => {
   // 각 주유소에 대한 마커 생성
-  for (const [index, station] of props.fuelStations.entries()) {
+  for (const [index, station] of stations.entries()) {
     try {
       let coords = null;
       
@@ -159,7 +170,7 @@ const createMarkers = async () => {
       const position = new window.kakao.maps.LatLng(coords.lat, coords.lng);
       
       // 마커 이미지 생성
-      const markerImage = createMarkerImage(station, props.fuelStations, index);
+      const markerImage = createMarkerImage(station, stations, index);
       
       // 마커 생성
       const marker = new window.kakao.maps.Marker({
@@ -167,12 +178,13 @@ const createMarkers = async () => {
         position: position,
         image: markerImage,
         title: station.OS_NM,
-        zIndex: isLowestPrice(station.PRICE, props.fuelStations) ? 2 : 1
+        zIndex: isLowestPrice(station.PRICE, stations) ? 2 : 1,
+        clickable: true // 클릭 가능하도록 설정
       });
       
       // 가격 표시 커스텀 오버레이 생성
       const priceContent = `
-        <div class="price-overlay ${isLowestPrice(station.PRICE, props.fuelStations) ? 'lowest-price' : ''}">
+        <div class="price-overlay ${isLowestPrice(station.PRICE, stations) ? 'lowest-price' : ''}">
           ${formatPrice(station.PRICE)}원
         </div>
       `;
@@ -180,7 +192,7 @@ const createMarkers = async () => {
       const priceOverlay = new window.kakao.maps.CustomOverlay({
         position: position,
         content: priceContent,
-        yAnchor: 1.5,
+        yAnchor: 3,
         zIndex: 3
       });
       
@@ -189,10 +201,10 @@ const createMarkers = async () => {
       
       // 거리 계산 (사용자 위치가 있는 경우)
       let distanceText = '';
-      if (userLocation) {
+      if (userLocation.value) {
         const distanceInKm = calculateHaversineDistance(
-          userLocation.latitude,
-          userLocation.longitude,
+          userLocation.value.latitude,
+          userLocation.value.longitude,
           coords.lat,
           coords.lng
         );
@@ -201,18 +213,17 @@ const createMarkers = async () => {
         distanceText = formatDistance(distanceInKm * 1000);
       }
       
-      // 최저가 주유소 확인
-      const isLowestPriceStation = isLowestPrice(station.PRICE, props.fuelStations);
-      
       // 인포윈도우 내용 생성
       const infoContent = `
-        <div class="station-info-window ${isLowestPriceStation ? 'lowest-price' : ''}">
-          <h3>${station.OS_NM} ${isLowestPriceStation ? '<span class="lowest-price-badge">최저가</span>' : ''}</h3>
-          <p><strong>브랜드:</strong> ${getBrandName(station.POLL_DIV_CD)}</p>
-          <p><strong>가격:</strong> <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
-          <p><strong>주소:</strong> ${station.NEW_ADR || station.VAN_ADR}</p>
-          ${distanceText ? `<p><strong>거리:</strong> ${distanceText}</p>` : ''}
-          <p><strong>좌표:</strong> ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}</p>
+        <div class="station-info-window ${isLowestPrice(station.PRICE, stations) ? 'lowest-price' : ''}">
+          <h3>
+            ${station.OS_NM}
+            ${isLowestPrice(station.PRICE, stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+          </h3>
+          <p>브랜드: ${getBrandName(station.POLL_DIV_CD)}</p>
+          <p>주소: ${station.NEW_ADR || station.VAN_ADR}</p>
+          <p>가격: <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
+          ${distanceText ? `<p>거리: ${distanceText}</p>` : ''}
         </div>
       `;
       
@@ -223,30 +234,32 @@ const createMarkers = async () => {
         zIndex: 10
       });
       
-      // 마커 클릭 이벤트 리스너 추가
-      window.kakao.maps.event.addListener(marker, 'click', () => {
-        // 모든 인포윈도우 닫기
+      // 마커 클릭 이벤트 리스너 등록
+      window.kakao.maps.event.addListener(marker, 'click', function() {
+        // 기존 열린 인포윈도우 닫기
         closeAllInfoWindows();
         
-        // 선택된 마커의 인포윈도우 열기
+        // 인포윈도우 열기
         infoWindow.open(map.value, marker);
         
-        // 마커에 인포윈도우 연결
+        // 마커와 인포윈도우 연결
         marker.infoWindow = infoWindow;
         
-        // 선택된 주유소 ID 업데이트
+        // 선택한 주유소 ID 이벤트 발생
         emit('select-station', station.UNI_ID);
       });
       
-      // 마커와 인포윈도우 저장
-      marker.infoWindow = null;
+      // 마커 배열에 추가
       markers.value.push(marker);
       
-      // 주유소 ID와 마커 매핑
+      // 마커맵에 추가
       markerMap.value[station.UNI_ID] = {
         marker,
+        infoWindow,
         priceOverlay,
-        coords
+        station,
+        coords,
+        infoContent
       };
       
       // 바운드에 위치 추가
@@ -256,18 +269,29 @@ const createMarkers = async () => {
     }
   }
   
+  return markers.value.length;
+};
+
+// 최저가 주유소 표시 함수
+const showLowestPriceStations = async (lowestPriceStations) => {
+  // 기존 마커 제거
+  clearMarkers();
+  
+  if (!lowestPriceStations || lowestPriceStations.length === 0) {
+    console.warn('표시할 최저가 주유소가 없습니다.');
+    return;
+  }
+  
+  // 모든 주유소에 대해 마커 생성
+  const bounds = new window.kakao.maps.LatLngBounds();
+  
+  // 주유소 마커 생성 함수 호출
+  await createStationMarkers(lowestPriceStations, bounds);
+  
   // 모든 마커가 보이도록 지도 범위 조정
   if (markers.value.length > 0) {
     map.value.setBounds(bounds);
   }
-  
-  // 선택된 주유소가 있으면 해당 마커로 이동
-  if (props.selectedStationId && markerMap.value[props.selectedStationId]) {
-    handleSelectStation(props.selectedStationId);
-  }
-  
-  // 로딩 상태 업데이트
-  loading.value = false;
 };
 
 // 모든 인포윈도우 닫기 함수
@@ -485,64 +509,33 @@ watch(() => props.fuelStations, async () => {
 
 // 선택된 주유소 ID 변경 시 해당 주유소로 지도 이동
 const handleSelectStation = (stationId) => {
-  // 모든 인포윈도우 닫기
-  closeAllInfoWindows();
-  
+  showStationInfoWindow(stationId);
+};
+
+// selectedStationId 변경 시 처리
+const showStationInfoWindow = (stationId) => {
   // 선택된 주유소가 없거나 마커맵에 없는 경우
   if (!stationId || !markerMap.value[stationId]) return;
+  
+  // 모든 인포윈도우 닫기
+  closeAllInfoWindows();
   
   const selectedStation = markerMap.value[stationId];
   const marker = selectedStation.marker;
   
-  // 선택된 주유소의 좌표로 지도 이동
-  const position = marker.getPosition();
-  map.value.setCenter(position);
-  
-  // 지도 줌 레벨 설정 (더 가까이 보기)
-  map.value.setLevel(3);
-  
-  // 선택된 주유소의 정보창 표시
-  const station = props.fuelStations.find(s => s.UNI_ID === stationId);
-  if (!station) return;
-  
-  // 최저가 주유소 확인
-  const isLowestPriceStation = isLowestPrice(station.PRICE, props.fuelStations);
-  
-  // 거리 계산 (사용자 위치가 있는 경우)
-  let distanceText = '';
-  if (userLocation.value) {
-    const distanceInKm = calculateHaversineDistance(
-      userLocation.value.latitude,
-      userLocation.value.longitude,
-      selectedStation.coords.lat,
-      selectedStation.coords.lng
-    );
-    
-    // 거리 포맷팅 (km 단위)
-    distanceText = formatDistance(distanceInKm * 1000);
-  }
-  
-  // 인포윈도우 내용 생성
-  const infoContent = `
-    <div class="station-info-window ${isLowestPriceStation ? 'lowest-price' : ''}">
-      <h3>${station.OS_NM} ${isLowestPriceStation ? '<span class="lowest-price-badge">최저가</span>' : ''}</h3>
-      <p><strong>브랜드:</strong> ${getBrandName(station.POLL_DIV_CD)}</p>
-      <p><strong>가격:</strong> <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
-      <p><strong>주소:</strong> ${station.NEW_ADR || station.VAN_ADR}</p>
-      ${distanceText ? `<p><strong>거리:</strong> ${distanceText}</p>` : ''}
-      <p><strong>좌표:</strong> ${selectedStation.coords.lat.toFixed(6)}, ${selectedStation.coords.lng.toFixed(6)}</p>
-    </div>
-  `;
-  
   // 인포윈도우 생성 및 표시
   const infoWindow = new window.kakao.maps.InfoWindow({
-    content: infoContent,
+    content: selectedStation.infoContent,
     removable: true,
     zIndex: 10
   });
   
   infoWindow.open(map.value, marker);
   marker.infoWindow = infoWindow;
+  
+  // 지도 중심 이동
+  map.value.setCenter(marker.getPosition());
+  map.value.setLevel(3); // 줌 레벨 설정
   
   // 선택된 마커 강조 표시
   // 모든 가격 오버레이 스타일 초기화
@@ -560,7 +553,7 @@ const handleSelectStation = (stationId) => {
 
 watch(() => props.selectedStationId, (newStationId) => {
   if (newStationId && markerMap.value[newStationId]) {
-    handleSelectStation(newStationId);
+    showStationInfoWindow(newStationId);
   } else {
     // 선택 해제 시 모든 인포윈도우 닫기
     closeAllInfoWindows();
@@ -573,148 +566,6 @@ watch(() => props.selectedStationId, (newStationId) => {
     });
   }
 });
-
-// 최저가 주유소 표시 함수
-const showLowestPriceStations = async (lowestPriceStations) => {
-  // 기존 마커 제거
-  clearMarkers();
-  
-  if (!lowestPriceStations || lowestPriceStations.length === 0) {
-    console.warn('표시할 최저가 주유소가 없습니다.');
-    return;
-  }
-  
-  // 모든 주유소에 대해 마커 생성
-  const bounds = new window.kakao.maps.LatLngBounds();
-  
-  // 각 주유소에 대한 마커 생성
-  for (const [index, station] of lowestPriceStations.entries()) {
-    try {
-      let coords = null;
-      
-      // 1. 주유소 객체에 GIS_X_COOR와 GIS_Y_COOR 필드가 있는지 확인 (KATEC 좌표)
-      if (station.GIS_X_COOR && station.GIS_Y_COOR) {
-        // KATEC 좌표를 WGS84로 변환
-        const katecX = parseFloat(station.GIS_X_COOR);
-        const katecY = parseFloat(station.GIS_Y_COOR);
-        
-        const wgs84 = convertKatecToWGS84(katecX, katecY);
-        if (wgs84) {
-          coords = {
-            lat: wgs84.lat,
-            lng: wgs84.lng
-          };
-        }
-      } 
-      // 2. 주유소 객체에 LAT, LNG 필드가 있는지 확인
-      else if (station.LAT && station.LNG) {
-        coords = {
-          lat: parseFloat(station.LAT),
-          lng: parseFloat(station.LNG)
-        };
-      }
-      // 3. 위경도 정보가 없는 경우 주소로 좌표 변환 (기존 방식)
-      else {
-        const address = station.NEW_ADR || station.VAN_ADR;
-        if (!address) continue;
-        
-        // 카카오 API로 주소를 좌표로 변환
-        coords = await getCoordinatesByAddress(address);
-      }
-      
-      // 좌표가 없으면 다음 주유소로
-      if (!coords) continue;
-      
-      // 마커 위치 생성
-      const position = new window.kakao.maps.LatLng(coords.lat, coords.lng);
-      
-      // 마커 이미지 생성
-      const markerImage = createMarkerImage(station, lowestPriceStations, index);
-      
-      // 마커 생성
-      const marker = new window.kakao.maps.Marker({
-        map: map.value,
-        position: position,
-        image: markerImage,
-        title: station.OS_NM,
-        zIndex: isLowestPrice(station.PRICE, lowestPriceStations) ? 2 : 1
-      });
-      
-      // 가격 표시 커스텀 오버레이 생성
-      const priceContent = `
-        <div class="price-overlay ${isLowestPrice(station.PRICE, lowestPriceStations) ? 'lowest-price' : ''}">
-          ${formatPrice(station.PRICE)}원
-        </div>
-      `;
-      
-      const priceOverlay = new window.kakao.maps.CustomOverlay({
-        position: position,
-        content: priceContent,
-        yAnchor: 1.5,
-        zIndex: 3
-      });
-      
-      // 커스텀 오버레이를 지도에 표시
-      priceOverlay.setMap(map.value);
-      
-      // 인포윈도우 내용 생성
-      const infoContent = `
-        <div class="station-info-window ${isLowestPrice(station.PRICE, lowestPriceStations) ? 'lowest-price' : ''}">
-          <h3>
-            ${station.OS_NM}
-            ${isLowestPrice(station.PRICE, lowestPriceStations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
-          </h3>
-          <p>브랜드: ${getBrandName(station.POLL_DIV_CD)}</p>
-          <p>주소: ${station.NEW_ADR || station.VAN_ADR}</p>
-          <p>가격: <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
-        </div>
-      `;
-      
-      // 인포윈도우 생성
-      const infoWindow = new window.kakao.maps.InfoWindow({
-        content: infoContent,
-        removable: true,
-        zIndex: 10
-      });
-      
-      // 마커 클릭 이벤트 리스너 등록
-      window.kakao.maps.event.addListener(marker, 'click', function() {
-        // 기존 열린 인포윈도우 닫기
-        closeAllInfoWindows();
-        
-        // 인포윈도우 열기
-        infoWindow.open(map.value, marker);
-        
-        // 마커와 인포윈도우 연결
-        marker.infoWindow = infoWindow;
-        
-        // 선택한 주유소 ID 이벤트 발생
-        emit('select-station', station.UNI_ID);
-      });
-      
-      // 마커 배열에 추가
-      markers.value.push(marker);
-      
-      // 마커맵에 추가
-      markerMap.value[station.UNI_ID] = {
-        marker,
-        infoWindow,
-        priceOverlay,
-        station
-      };
-      
-      // 바운드에 위치 추가
-      bounds.extend(position);
-    } catch (error) {
-      console.error(`주유소 마커 생성 중 오류 발생 (${station.OS_NM}):`, error);
-    }
-  }
-  
-  // 모든 마커가 보이도록 지도 범위 조정
-  if (markers.value.length > 0) {
-    map.value.setBounds(bounds);
-  }
-};
 
 // 컴포넌트가 마운트될 때 지도 초기화
 onMounted(() => {
@@ -747,7 +598,8 @@ onUnmounted(() => {
 // 외부에서 접근할 수 있는 메서드 노출
 defineExpose({
   moveToStation,
-  showLowestPriceStations
+  showLowestPriceStations,
+  showStationInfoWindow
 });
 </script>
 
@@ -791,7 +643,6 @@ defineExpose({
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   border: 1px solid #ddd;
   white-space: nowrap;
-  transform: translateY(-25px);
 }
 
 :deep(.price-overlay.lowest-price) {
@@ -803,9 +654,11 @@ defineExpose({
 /* 인포윈도우 스타일 */
 :deep(.station-info-window) {
   padding: 10px;
-  width: 250px;
-  font-size: 13px;
+  width: 280px;
+  font-size: 14px;
   line-height: 1.5;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
 }
 
 :deep(.station-info-window h3) {

@@ -274,20 +274,35 @@ const fetchFuelStations = async () => {
 // 주유소 선택 핸들러
 const handleStationSelect = (stationId) => {
   selectedStationId.value = stationId;
+  
+  // 지도 컴포넌트의 showStationInfoWindow 메서드 호출
+  if (fuelListMapRef.value) {
+    fuelListMapRef.value.showStationInfoWindow(stationId);
+  }
 };
 
 // 최저가 주유소 표시 핸들러
 const showLowestPriceStations = async () => {
   try {
+    loading.value = true;
     const lowestPriceStations = await fetchLowestPriceFuelStations(
       selectedFuelType.value, 
       selectedArea.value
     );
     
+    // 최저가 주유소 데이터로 gasStations 업데이트
+    gasStations.value = lowestPriceStations;
+    
+    // 보이는 주유소 개수 초기화
+    visibleCount.value = 6;
+    
     // 카카오 맵에 최저가 주유소 표시
     fuelListMapRef.value.showLowestPriceStations(lowestPriceStations);
   } catch (error) {
     console.error('최저가 주유소를 가져오는데 실패했습니다:', error);
+    error.value = '최저가 주유소를 가져오는데 실패했습니다.';
+  } finally {
+    loading.value = false;
   }
 };
 
