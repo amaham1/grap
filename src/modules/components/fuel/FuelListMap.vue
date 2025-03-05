@@ -48,6 +48,9 @@ const userLocationMarker = ref(null);
 const userLocation = ref(null); // 사용자 위치 정보 저장
 const activeInfoWindow = ref(null);
 const stationDetails = ref(new Map());
+const activeMarker = ref(null); // 현재 활성화된 마커
+const defaultMarkerImage = ref(null); // 기본 마커 이미지
+const selectedMarkerImage = ref(null); // 선택된 마커 이미지
 
 // 마커 제거 함수
 const clearMarkers = () => {
@@ -180,7 +183,7 @@ const createStationMarkers = async (stations, bounds) => {
       const marker = new window.kakao.maps.Marker({
         map: map.value,
         position: position,
-        image: markerImage,
+        image: defaultMarkerImage.value,
         title: station.OS_NM,
         zIndex: isLowestPrice(station.PRICE, stations) ? 2 : 1,
         clickable: true // 클릭 가능하도록 설정
@@ -232,6 +235,17 @@ const createStationMarkers = async (stations, bounds) => {
         // 기존 열린 인포윈도우 닫기
         closeAllInfoWindows();
         
+        // 기존 활성화 마커가 있으면 기본 이미지로 변경
+        if (activeMarker.value && activeMarker.value !== marker) {
+          activeMarker.value.setImage(defaultMarkerImage.value);
+        }
+        
+        // 현재 마커를 선택된 이미지로 변경
+        marker.setImage(selectedMarkerImage.value);
+        
+        // 현재 마커를 활성 마커로 설정
+        activeMarker.value = marker;
+        
         // 기본 정보로 인포윈도우 생성
         const initialContent = createInfoWindowContent(station, stations);
         
@@ -239,6 +253,15 @@ const createStationMarkers = async (stations, bounds) => {
           content: initialContent,
           removable: true,
           zIndex: 10
+        });
+        
+        // 인포윈도우 닫힘 이벤트 리스너 등록
+        window.kakao.maps.event.addListener(infoWindow, 'closeclick', function() {
+          // 마커 이미지를 기본으로 변경
+          if (activeMarker.value === marker) {
+            marker.setImage(defaultMarkerImage.value);
+            activeMarker.value = null;
+          }
         });
         
         // 인포윈도우 열기
@@ -301,6 +324,12 @@ const closeAllInfoWindows = () => {
   if (activeInfoWindow.value) {
     activeInfoWindow.value.close();
     activeInfoWindow.value = null;
+    
+    // 활성화된 마커가 있으면 기본 이미지로 변경
+    if (activeMarker.value) {
+      activeMarker.value.setImage(defaultMarkerImage.value);
+      activeMarker.value = null;
+    }
   }
 };
 
@@ -477,20 +506,8 @@ const createInfoWindowContent = (station, stations, detailData = null) => {
   // 거리 계산 (사용자 위치가 있는 경우)
   let distanceText = '';
   if (userLocation.value) {
-    const coords = {
-      lat: parseFloat(station.GIS_X_COOR || station.LAT),
-      lng: parseFloat(station.GIS_Y_COOR || station.LNG)
-    };
-    
-    const distanceInKm = calculateHaversineDistance(
-      userLocation.value.latitude,
-      userLocation.value.longitude,
-      coords.lat,
-      coords.lng
-    );
-    
     // 거리 포맷팅 (km 단위)
-    distanceText = formatDistance(distanceInKm * 1000);
+    distanceText = formatDistance(station.DISTANCE);
   }
   
   // 기본 정보
@@ -562,6 +579,18 @@ const initializeMap = async () => {
     // 지도 생성
     map.value = new window.kakao.maps.Map(container, options);
     
+    // 기본 마커 이미지 생성
+    defaultMarkerImage.value = new window.kakao.maps.MarkerImage(
+      'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
+      new window.kakao.maps.Size(24, 35)
+    );
+    
+    // 선택된 마커 이미지 생성 (다른 색상의 마커)
+    selectedMarkerImage.value = new window.kakao.maps.MarkerImage(
+      'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png', 
+      new window.kakao.maps.Size(24, 35)
+    );
+    
     // 마커 생성
     await createMarkers();
     
@@ -603,8 +632,19 @@ const showStationInfoWindow = (stationId) => {
   const marker = markerMap.value[stationId];
   if (!marker) return;
   
-  // 기존 인포윈도우 닫기
+  // 기존 열린 인포윈도우 닫기
   closeAllInfoWindows();
+  
+  // 기존 활성화 마커가 있으면 기본 이미지로 변경
+  if (activeMarker.value && activeMarker.value !== marker) {
+    activeMarker.value.setImage(defaultMarkerImage.value);
+  }
+  
+  // 현재 마커를 선택된 이미지로 변경
+  marker.setImage(selectedMarkerImage.value);
+  
+  // 현재 마커를 활성 마커로 설정
+  activeMarker.value = marker;
   
   // 해당 주유소 정보 찾기
   const station = props.fuelStations.find(s => s.UNI_ID === stationId);
@@ -617,6 +657,15 @@ const showStationInfoWindow = (stationId) => {
     content: initialContent,
     removable: true,
     zIndex: 10
+  });
+  
+  // 인포윈도우 닫힘 이벤트 리스너 등록
+  window.kakao.maps.event.addListener(infoWindow, 'closeclick', function() {
+    // 마커 이미지를 기본으로 변경
+    if (activeMarker.value === marker) {
+      marker.setImage(defaultMarkerImage.value);
+      activeMarker.value = null;
+    }
   });
   
   // 인포윈도우 열기
