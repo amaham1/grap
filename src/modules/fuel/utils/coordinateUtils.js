@@ -91,7 +91,7 @@ export function useGasStationFinder() {
 
       try {
           const katecCoords = convertToKATEC(longitude, latitude);
-          console.log(katecCoords);
+          
           const response = await axios.get(API_BASE_URL, {
               params: {
                   code: apiKey.value,
@@ -103,7 +103,6 @@ export function useGasStationFinder() {
                   out: 'json' // 응답 형식
               }
           });
-          console.log(response);
 
           if (response.data.RESULT && response.data.RESULT.OIL) {
               // 주유소 데이터를 먼저 가격순으로 정렬하고, 가격이 같으면 거리순으로 정렬

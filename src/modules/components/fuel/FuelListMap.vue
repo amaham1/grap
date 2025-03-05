@@ -15,6 +15,7 @@ import { getCoordinatesByAddress } from '@/modules/fuel/api/kakaoMapService';
 import { getBrandName } from '@/modules/fuel/utils/brandUtils';
 import { getPriceColor, isLowestPrice } from '@/modules/fuel/utils/colorUtils';
 import { calculateHaversineDistance, formatDistance, getCurrentLocation } from '@/modules/fuel/api/kakaoMobilityService';
+import { convertKatecToWGS84 } from '@/modules/fuel/utils/coordinateUtils';
 import UserLocationDisplay from '@/modules/components/common/UserLocationDisplay.vue';
 
 const props = defineProps({
@@ -101,17 +102,7 @@ const createMarkerImage = (station, allStations, index) => {
 // 마커 생성 함수
 const createMarkers = async () => {
   // 기존 마커 제거
-  markers.value.forEach(marker => marker.setMap(null));
-  
-  // 기존 가격 오버레이 제거
-  Object.values(markerMap.value).forEach(item => {
-    if (item.priceOverlay) {
-      item.priceOverlay.setMap(null);
-    }
-  });
-  
-  markers.value = [];
-  markerMap.value = {};
+  clearMarkers();
   
   // 사용자 위치 표시
   const userLocation = await showUserLocation();
@@ -129,12 +120,39 @@ const createMarkers = async () => {
   // 각 주유소에 대한 마커 생성
   for (const [index, station] of props.fuelStations.entries()) {
     try {
-      // 주소로 좌표 변환
-      const address = station.NEW_ADR || station.VAN_ADR;
-      if (!address) continue;
+      let coords = null;
       
-      // 카카오 API로 주소를 좌표로 변환
-      const coords = await getCoordinatesByAddress(address);
+      // 1. 주유소 객체에 GIS_X_COOR와 GIS_Y_COOR 필드가 있는지 확인 (KATEC 좌표)
+      if (station.GIS_X_COOR && station.GIS_Y_COOR) {
+        // KATEC 좌표를 WGS84로 변환
+        const katecX = parseFloat(station.GIS_X_COOR);
+        const katecY = parseFloat(station.GIS_Y_COOR);
+        
+        const wgs84 = convertKatecToWGS84(katecX, katecY);
+        if (wgs84) {
+          coords = {
+            lat: wgs84.lat,
+            lng: wgs84.lng
+          };
+        }
+      } 
+      // 2. 주유소 객체에 LAT, LNG 필드가 있는지 확인
+      else if (station.LAT && station.LNG) {
+        coords = {
+          lat: parseFloat(station.LAT),
+          lng: parseFloat(station.LNG)
+        };
+      }
+      // 3. 위경도 정보가 없는 경우 주소로 좌표 변환 (기존 방식)
+      else {
+        const address = station.NEW_ADR || station.VAN_ADR;
+        if (!address) continue;
+        
+        // 카카오 API로 주소를 좌표로 변환
+        coords = await getCoordinatesByAddress(address);
+      }
+      
+      // 좌표가 없으면 다음 주유소로
       if (!coords) continue;
       
       // 마커 위치 생성
@@ -172,7 +190,6 @@ const createMarkers = async () => {
       // 거리 계산 (사용자 위치가 있는 경우)
       let distanceText = '';
       if (userLocation) {
-        // 하버사인 공식으로 직선 거리 계산 (km)
         const distanceInKm = calculateHaversineDistance(
           userLocation.latitude,
           userLocation.longitude,
@@ -180,84 +197,77 @@ const createMarkers = async () => {
           coords.lng
         );
         
-        // 미터 단위로 변환
-        const distanceInMeters = distanceInKm * 1000;
-        
-        // 거리 포맷팅
-        distanceText = formatDistance(distanceInMeters);
+        // 거리 포맷팅 (km 단위)
+        distanceText = formatDistance(distanceInKm * 1000);
       }
       
-      // 최저가 여부 확인
+      // 최저가 주유소 확인
       const isLowestPriceStation = isLowestPrice(station.PRICE, props.fuelStations);
       
       // 인포윈도우 내용 생성
       const infoContent = `
-        <div class="map-info-window">
+        <div class="station-info-window ${isLowestPriceStation ? 'lowest-price' : ''}">
           <h3>${station.OS_NM} ${isLowestPriceStation ? '<span class="lowest-price-badge">최저가</span>' : ''}</h3>
           <p><strong>브랜드:</strong> ${getBrandName(station.POLL_DIV_CD)}</p>
           <p><strong>가격:</strong> <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
-          <p><strong>주소:</strong> ${address}</p>
+          <p><strong>주소:</strong> ${station.NEW_ADR || station.VAN_ADR}</p>
           ${distanceText ? `<p><strong>거리:</strong> ${distanceText}</p>` : ''}
+          <p><strong>좌표:</strong> ${coords.lat.toFixed(6)}, ${coords.lng.toFixed(6)}</p>
         </div>
       `;
       
-      // 마커 맵에 추가 (ID로 접근 가능하도록)
-      markerMap.value[station.UNI_ID] = {
-        marker,
-        coords,
-        infoContent,
-        priceOverlay
-      };
+      // 인포윈도우 생성
+      const infoWindow = new window.kakao.maps.InfoWindow({
+        content: infoContent,
+        removable: true,
+        zIndex: 10
+      });
       
-      // 마커에 마우스 올렸을 때 이벤트
-      window.kakao.maps.event.addListener(marker, 'mouseover', function() {
-        // 다른 인포윈도우 모두 닫기
+      // 마커 클릭 이벤트 리스너 추가
+      window.kakao.maps.event.addListener(marker, 'click', () => {
+        // 모든 인포윈도우 닫기
         closeAllInfoWindows();
         
-        // 현재 마커에 인포윈도우 열기
-        const infoWindow = new window.kakao.maps.InfoWindow({
-          content: markerMap.value[station.UNI_ID].infoContent,
-          removable: false
-        });
-        
+        // 선택된 마커의 인포윈도우 열기
         infoWindow.open(map.value, marker);
+        
+        // 마커에 인포윈도우 연결
         marker.infoWindow = infoWindow;
-      });
-      
-      // 마커에서 마우스가 벗어났을 때 이벤트
-      window.kakao.maps.event.addListener(marker, 'mouseout', function() {
-        // 선택된 주유소가 아니면 인포윈도우 닫기
-        if (props.selectedStationId !== station.UNI_ID) {
-          if (marker.infoWindow) {
-            marker.infoWindow.close();
-            marker.infoWindow = null;
-          }
-        }
-      });
-      
-      // 마커 클릭 이벤트 처리
-      window.kakao.maps.event.addListener(marker, 'click', function() {
-        // 선택한 주유소 ID 이벤트 발생
+        
+        // 선택된 주유소 ID 업데이트
         emit('select-station', station.UNI_ID);
       });
       
-      // 마커 배열에 추가
+      // 마커와 인포윈도우 저장
+      marker.infoWindow = null;
       markers.value.push(marker);
+      
+      // 주유소 ID와 마커 매핑
+      markerMap.value[station.UNI_ID] = {
+        marker,
+        priceOverlay,
+        coords
+      };
       
       // 바운드에 위치 추가
       bounds.extend(position);
     } catch (error) {
-      console.error(`주유소 마커 생성 중 오류 (${station.OS_NM}):`, error);
+      console.error(`주유소 마커 생성 중 오류 발생 (${station.OS_NM}):`, error);
     }
   }
   
-  // 모든 마커를 바운드에 추가
-  markers.value.forEach(marker => {
-    bounds.extend(marker.getPosition());
-  });
+  // 모든 마커가 보이도록 지도 범위 조정
+  if (markers.value.length > 0) {
+    map.value.setBounds(bounds);
+  }
   
-  // 바운드에 맞게 지도 중심 및 레벨 조정
-  map.value.setBounds(bounds);
+  // 선택된 주유소가 있으면 해당 마커로 이동
+  if (props.selectedStationId && markerMap.value[props.selectedStationId]) {
+    handleSelectStation(props.selectedStationId);
+  }
+  
+  // 로딩 상태 업데이트
+  loading.value = false;
 };
 
 // 모든 인포윈도우 닫기 함수
@@ -475,53 +485,77 @@ watch(() => props.fuelStations, async () => {
 
 // 선택된 주유소 ID 변경 시 해당 주유소로 지도 이동
 const handleSelectStation = (stationId) => {
-  if (!stationId || !markerMap.value[stationId]) return;
-  
-  // 선택된 주유소 정보 가져오기
-  const { marker, coords } = markerMap.value[stationId];
-  
   // 모든 인포윈도우 닫기
   closeAllInfoWindows();
   
-  // 모든 가격 오버레이 스타일 초기화
-  Object.values(markerMap.value).forEach(item => {
-    if (item.priceOverlay) {
-      const overlayElement = item.priceOverlay.getContent();
-      if (overlayElement instanceof Element) {
-        overlayElement.querySelector('.price-overlay')?.classList.remove('selected');
-      } else if (typeof overlayElement === 'string') {
-        // 문자열인 경우 새로운 콘텐츠로 교체
-        const priceDiv = overlayElement.replace('selected', '');
-        item.priceOverlay.setContent(priceDiv);
-      }
-    }
-  });
+  // 선택된 주유소가 없거나 마커맵에 없는 경우
+  if (!stationId || !markerMap.value[stationId]) return;
   
-  // 선택된 주유소의 가격 오버레이 스타일 변경
-  if (markerMap.value[stationId].priceOverlay) {
-    const overlayElement = markerMap.value[stationId].priceOverlay.getContent();
-    if (typeof overlayElement === 'string') {
-      // HTML 문자열에서 class 추가
-      const newContent = overlayElement.replace('price-overlay', 'price-overlay selected');
-      markerMap.value[stationId].priceOverlay.setContent(newContent);
-    }
+  const selectedStation = markerMap.value[stationId];
+  const marker = selectedStation.marker;
+  
+  // 선택된 주유소의 좌표로 지도 이동
+  const position = marker.getPosition();
+  map.value.setCenter(position);
+  
+  // 지도 줌 레벨 설정 (더 가까이 보기)
+  map.value.setLevel(3);
+  
+  // 선택된 주유소의 정보창 표시
+  const station = props.fuelStations.find(s => s.UNI_ID === stationId);
+  if (!station) return;
+  
+  // 최저가 주유소 확인
+  const isLowestPriceStation = isLowestPrice(station.PRICE, props.fuelStations);
+  
+  // 거리 계산 (사용자 위치가 있는 경우)
+  let distanceText = '';
+  if (userLocation.value) {
+    const distanceInKm = calculateHaversineDistance(
+      userLocation.value.latitude,
+      userLocation.value.longitude,
+      selectedStation.coords.lat,
+      selectedStation.coords.lng
+    );
+    
+    // 거리 포맷팅 (km 단위)
+    distanceText = formatDistance(distanceInKm * 1000);
   }
+  
+  // 인포윈도우 내용 생성
+  const infoContent = `
+    <div class="station-info-window ${isLowestPriceStation ? 'lowest-price' : ''}">
+      <h3>${station.OS_NM} ${isLowestPriceStation ? '<span class="lowest-price-badge">최저가</span>' : ''}</h3>
+      <p><strong>브랜드:</strong> ${getBrandName(station.POLL_DIV_CD)}</p>
+      <p><strong>가격:</strong> <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
+      <p><strong>주소:</strong> ${station.NEW_ADR || station.VAN_ADR}</p>
+      ${distanceText ? `<p><strong>거리:</strong> ${distanceText}</p>` : ''}
+      <p><strong>좌표:</strong> ${selectedStation.coords.lat.toFixed(6)}, ${selectedStation.coords.lng.toFixed(6)}</p>
+    </div>
+  `;
   
   // 인포윈도우 생성 및 표시
   const infoWindow = new window.kakao.maps.InfoWindow({
-    content: markerMap.value[stationId].infoContent,
-    removable: false
+    content: infoContent,
+    removable: true,
+    zIndex: 10
   });
   
   infoWindow.open(map.value, marker);
   marker.infoWindow = infoWindow;
   
-  // 지도 중심 이동
-  const position = new window.kakao.maps.LatLng(coords.lat, coords.lng);
-  map.value.setCenter(position);
+  // 선택된 마커 강조 표시
+  // 모든 가격 오버레이 스타일 초기화
+  Object.values(markerMap.value).forEach(item => {
+    if (item.priceOverlay) {
+      item.priceOverlay.setZIndex(3);
+    }
+  });
   
-  // 지도 확대 레벨 설정
-  map.value.setLevel(3);
+  // 선택된 주유소의 가격 오버레이 강조
+  if (selectedStation.priceOverlay) {
+    selectedStation.priceOverlay.setZIndex(5);
+  }
 };
 
 watch(() => props.selectedStationId, (newStationId) => {
@@ -534,15 +568,153 @@ watch(() => props.selectedStationId, (newStationId) => {
     // 모든 가격 오버레이 스타일 초기화
     Object.values(markerMap.value).forEach(item => {
       if (item.priceOverlay) {
-        const overlayElement = item.priceOverlay.getContent();
-        if (typeof overlayElement === 'string') {
-          const priceDiv = overlayElement.replace('selected', '');
-          item.priceOverlay.setContent(priceDiv);
-        }
+        item.priceOverlay.setZIndex(3);
       }
     });
   }
 });
+
+// 최저가 주유소 표시 함수
+const showLowestPriceStations = async (lowestPriceStations) => {
+  // 기존 마커 제거
+  clearMarkers();
+  
+  if (!lowestPriceStations || lowestPriceStations.length === 0) {
+    console.warn('표시할 최저가 주유소가 없습니다.');
+    return;
+  }
+  
+  // 모든 주유소에 대해 마커 생성
+  const bounds = new window.kakao.maps.LatLngBounds();
+  
+  // 각 주유소에 대한 마커 생성
+  for (const [index, station] of lowestPriceStations.entries()) {
+    try {
+      let coords = null;
+      
+      // 1. 주유소 객체에 GIS_X_COOR와 GIS_Y_COOR 필드가 있는지 확인 (KATEC 좌표)
+      if (station.GIS_X_COOR && station.GIS_Y_COOR) {
+        // KATEC 좌표를 WGS84로 변환
+        const katecX = parseFloat(station.GIS_X_COOR);
+        const katecY = parseFloat(station.GIS_Y_COOR);
+        
+        const wgs84 = convertKatecToWGS84(katecX, katecY);
+        if (wgs84) {
+          coords = {
+            lat: wgs84.lat,
+            lng: wgs84.lng
+          };
+        }
+      } 
+      // 2. 주유소 객체에 LAT, LNG 필드가 있는지 확인
+      else if (station.LAT && station.LNG) {
+        coords = {
+          lat: parseFloat(station.LAT),
+          lng: parseFloat(station.LNG)
+        };
+      }
+      // 3. 위경도 정보가 없는 경우 주소로 좌표 변환 (기존 방식)
+      else {
+        const address = station.NEW_ADR || station.VAN_ADR;
+        if (!address) continue;
+        
+        // 카카오 API로 주소를 좌표로 변환
+        coords = await getCoordinatesByAddress(address);
+      }
+      
+      // 좌표가 없으면 다음 주유소로
+      if (!coords) continue;
+      
+      // 마커 위치 생성
+      const position = new window.kakao.maps.LatLng(coords.lat, coords.lng);
+      
+      // 마커 이미지 생성
+      const markerImage = createMarkerImage(station, lowestPriceStations, index);
+      
+      // 마커 생성
+      const marker = new window.kakao.maps.Marker({
+        map: map.value,
+        position: position,
+        image: markerImage,
+        title: station.OS_NM,
+        zIndex: isLowestPrice(station.PRICE, lowestPriceStations) ? 2 : 1
+      });
+      
+      // 가격 표시 커스텀 오버레이 생성
+      const priceContent = `
+        <div class="price-overlay ${isLowestPrice(station.PRICE, lowestPriceStations) ? 'lowest-price' : ''}">
+          ${formatPrice(station.PRICE)}원
+        </div>
+      `;
+      
+      const priceOverlay = new window.kakao.maps.CustomOverlay({
+        position: position,
+        content: priceContent,
+        yAnchor: 1.5,
+        zIndex: 3
+      });
+      
+      // 커스텀 오버레이를 지도에 표시
+      priceOverlay.setMap(map.value);
+      
+      // 인포윈도우 내용 생성
+      const infoContent = `
+        <div class="station-info-window ${isLowestPrice(station.PRICE, lowestPriceStations) ? 'lowest-price' : ''}">
+          <h3>
+            ${station.OS_NM}
+            ${isLowestPrice(station.PRICE, lowestPriceStations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+          </h3>
+          <p>브랜드: ${getBrandName(station.POLL_DIV_CD)}</p>
+          <p>주소: ${station.NEW_ADR || station.VAN_ADR}</p>
+          <p>가격: <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
+        </div>
+      `;
+      
+      // 인포윈도우 생성
+      const infoWindow = new window.kakao.maps.InfoWindow({
+        content: infoContent,
+        removable: true,
+        zIndex: 10
+      });
+      
+      // 마커 클릭 이벤트 리스너 등록
+      window.kakao.maps.event.addListener(marker, 'click', function() {
+        // 기존 열린 인포윈도우 닫기
+        closeAllInfoWindows();
+        
+        // 인포윈도우 열기
+        infoWindow.open(map.value, marker);
+        
+        // 마커와 인포윈도우 연결
+        marker.infoWindow = infoWindow;
+        
+        // 선택한 주유소 ID 이벤트 발생
+        emit('select-station', station.UNI_ID);
+      });
+      
+      // 마커 배열에 추가
+      markers.value.push(marker);
+      
+      // 마커맵에 추가
+      markerMap.value[station.UNI_ID] = {
+        marker,
+        infoWindow,
+        priceOverlay,
+        station
+      };
+      
+      // 바운드에 위치 추가
+      bounds.extend(position);
+    } catch (error) {
+      console.error(`주유소 마커 생성 중 오류 발생 (${station.OS_NM}):`, error);
+    }
+  }
+  
+  // 모든 마커가 보이도록 지도 범위 조정
+  if (markers.value.length > 0) {
+    map.value.setBounds(bounds);
+  }
+};
 
 // 컴포넌트가 마운트될 때 지도 초기화
 onMounted(() => {
@@ -574,15 +746,16 @@ onUnmounted(() => {
 
 // 외부에서 접근할 수 있는 메서드 노출
 defineExpose({
-  moveToStation
+  moveToStation,
+  showLowestPriceStations
 });
 </script>
 
 <style scoped>
 .fuel-list-map {
-  width: 100%;
-  height: 500px;
   position: relative;
+  width: 100%;
+  height: 600px;
   margin-bottom: 20px;
   border-radius: 8px;
   overflow: hidden;
@@ -598,91 +771,73 @@ defineExpose({
   position: absolute;
   top: 0;
   left: 0;
-  right: 0;
-  bottom: 0;
+  width: 100%;
+  height: 100%;
   display: flex;
-  justify-content: center;
   align-items: center;
+  justify-content: center;
   background-color: rgba(255, 255, 255, 0.8);
   z-index: 10;
 }
 
-/* 인포윈도우 스타일 - 전역으로 적용되도록 :global 사용 */
-:global(.map-info-window) {
-  padding: 10px;
-  min-width: 200px;
-  max-width: 300px;
-  font-family: 'Noto Sans KR', sans-serif;
+/* 가격 오버레이 스타일 */
+:deep(.price-overlay) {
+  background-color: white;
+  color: #333;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  border: 1px solid #ddd;
+  white-space: nowrap;
+  transform: translateY(-25px);
 }
 
-:global(.map-info-window h3) {
+:deep(.price-overlay.lowest-price) {
+  background-color: #ffeb3b;
+  color: #333;
+  border-color: #ffc107;
+}
+
+/* 인포윈도우 스타일 */
+:deep(.station-info-window) {
+  padding: 10px;
+  width: 250px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+:deep(.station-info-window h3) {
   margin: 0 0 8px 0;
   font-size: 16px;
   font-weight: bold;
+  color: #333;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
 
-:global(.map-info-window p) {
-  margin: 4px 0;
-  font-size: 14px;
-  color: #333;
+:deep(.station-info-window p) {
+  margin: 5px 0;
 }
 
-:global(.lowest-price-badge) {
-  background-color: gold;
+:deep(.lowest-price-badge) {
+  background-color: #ffeb3b;
   color: #333;
   font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 8px;
-  font-weight: normal;
-}
-
-:global(.price-value) {
+  padding: 2px 5px;
+  border-radius: 3px;
+  margin-left: 5px;
   font-weight: bold;
-  color: #333;
 }
 
-:global(.user-location h3) {
-  color: #3498db;
-}
-
-:global(.user-location) {
-  background-color: #f8f9fa;
-  border-left: 3px solid #3498db;
-}
-
-.price-overlay {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  font-size: 13px;
+:deep(.price-value) {
   font-weight: bold;
-  color: #333;
-  background-color: rgba(255, 255, 255, 0.9);
-  padding: 2px 4px;
-  border-radius: 4px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  border: 1px solid #ddd;
-  white-space: nowrap;
-  text-align: center;
+  color: #e53935;
 }
 
-.price-overlay.lowest-price {
-  background-color: rgba(255, 248, 220, 0.95);
-  color: #d35400;
-  border-color: #f39c12;
-  font-weight: 900;
-}
-
-.price-overlay.selected {
-  background-color: rgba(52, 152, 219, 0.95);
-  color: white;
-  border-color: #2980b9;
-  font-weight: 900;
-  transform: translate(-50%, -50%) scale(1.2);
-  z-index: 10;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+:deep(.station-info-window.lowest-price) {
+  border-left: 4px solid #ffc107;
 }
 </style>
