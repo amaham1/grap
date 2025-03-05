@@ -9,12 +9,14 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, defineProps, defineExpose, defineEmits } from 'vue';
+import { ref, onMounted, onUnmounted, watch, defineProps, defineEmits } from 'vue';
+import { getBrandName } from '@/modules/fuel/utils/brandUtils';
+import { calculateHaversineDistance } from '@/modules/fuel/api/kakaoMobilityService';
+import { fetchFuelStationDetail } from '@/modules/fuel/api/fuelService';
 import { initKakaoMap } from '@/api/kakaoMapApi';
 import { getCoordinatesByAddress } from '@/modules/fuel/api/kakaoMapService';
-import { getBrandName } from '@/modules/fuel/utils/brandUtils';
 import { getPriceColor, isLowestPrice } from '@/modules/fuel/utils/colorUtils';
-import { calculateHaversineDistance, formatDistance, getCurrentLocation } from '@/modules/fuel/api/kakaoMobilityService';
+import { formatDistance, getCurrentLocation } from '@/modules/fuel/api/kakaoMobilityService';
 import { convertKatecToWGS84 } from '@/modules/fuel/utils/coordinateUtils';
 import UserLocationDisplay from '@/modules/components/common/UserLocationDisplay.vue';
 
@@ -44,6 +46,8 @@ const currentCenter = ref({ ...defaultCenter.value });
 const markerMap = ref({}); // 주유소 ID와 마커를 매핑하는 객체
 const userLocationMarker = ref(null);
 const userLocation = ref(null); // 사용자 위치 정보 저장
+const activeInfoWindow = ref(null);
+const stationDetails = ref(new Map());
 
 // 마커 제거 함수
 const clearMarkers = () => {
@@ -214,18 +218,7 @@ const createStationMarkers = async (stations, bounds) => {
       }
       
       // 인포윈도우 내용 생성
-      const infoContent = `
-        <div class="station-info-window ${isLowestPrice(station.PRICE, stations) ? 'lowest-price' : ''}">
-          <h3>
-            ${station.OS_NM}
-            ${isLowestPrice(station.PRICE, stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
-          </h3>
-          <p>브랜드: ${getBrandName(station.POLL_DIV_CD)}</p>
-          <p>주소: ${station.NEW_ADR || station.VAN_ADR}</p>
-          <p>가격: <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
-          ${distanceText ? `<p>거리: ${distanceText}</p>` : ''}
-        </div>
-      `;
+      const infoContent = createInfoWindowContent(station, stations);
       
       // 인포윈도우 생성
       const infoWindow = new window.kakao.maps.InfoWindow({
@@ -239,30 +232,38 @@ const createStationMarkers = async (stations, bounds) => {
         // 기존 열린 인포윈도우 닫기
         closeAllInfoWindows();
         
+        // 기본 정보로 인포윈도우 생성
+        const initialContent = createInfoWindowContent(station, stations);
+        
+        const infoWindow = new window.kakao.maps.InfoWindow({
+          content: initialContent,
+          removable: true,
+          zIndex: 10
+        });
+        
         // 인포윈도우 열기
         infoWindow.open(map.value, marker);
         
-        // 마커와 인포윈도우 연결
-        marker.infoWindow = infoWindow;
+        // 활성 인포윈도우 저장
+        activeInfoWindow.value = infoWindow;
         
         // 선택한 주유소 ID 이벤트 발생
         emit('select-station', station.UNI_ID);
+        
+        // 상세 정보 로딩 표시
+        infoWindow.setContent(createInfoWindowContent(station, stations, undefined));
+        
+        // 별도 함수로 상세 정보 로딩 처리
+        loadStationDetail(station.UNI_ID, infoWindow, station, stations);
       });
       
       // 마커 배열에 추가
       markers.value.push(marker);
       
-      // 마커맵에 추가
-      markerMap.value[station.UNI_ID] = {
-        marker,
-        infoWindow,
-        priceOverlay,
-        station,
-        coords,
-        infoContent
-      };
+      // 마커맵에 저장
+      markerMap.value[station.UNI_ID] = marker;
       
-      // 바운드에 위치 추가
+      // 경계 확장
       bounds.extend(position);
     } catch (error) {
       console.error(`주유소 마커 생성 중 오류 발생 (${station.OS_NM}):`, error);
@@ -296,13 +297,11 @@ const showLowestPriceStations = async (lowestPriceStations) => {
 
 // 모든 인포윈도우 닫기 함수
 const closeAllInfoWindows = () => {
-  // 모든 마커의 인포윈도우 닫기
-  markers.value.forEach(marker => {
-    if (marker.infoWindow) {
-      marker.infoWindow.close();
-      marker.infoWindow = null;
-    }
-  });
+  // 열려있는 인포윈도우가 있으면 닫기
+  if (activeInfoWindow.value) {
+    activeInfoWindow.value.close();
+    activeInfoWindow.value = null;
+  }
 };
 
 // 사용자 현재 위치 가져오기 및 표시
@@ -449,6 +448,92 @@ const formatPrice = (price) => {
   return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
+// 주유소 상세 정보 가져오기
+const fetchStationDetail = async (stationId) => {
+  try {
+    // 이미 가져온 정보가 있으면 캐시에서 사용
+    if (stationDetails.value.has(stationId)) {
+      return stationDetails.value.get(stationId);
+    }
+    
+    // API에서 상세 정보 가져오기
+    const detailData = await fetchFuelStationDetail(stationId);
+    
+    // 캐시에 저장
+    if (detailData) {
+      stationDetails.value.set(stationId, detailData);
+    }
+    
+    return detailData;
+  } catch (error) {
+    console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
+    return null;
+  }
+};
+
+// 인포윈도우 내용 생성
+const createInfoWindowContent = (station, stations, detailData = null) => {
+  console.log(detailData)
+  // 거리 계산 (사용자 위치가 있는 경우)
+  let distanceText = '';
+  if (userLocation.value) {
+    const coords = {
+      lat: parseFloat(station.GIS_X_COOR || station.LAT),
+      lng: parseFloat(station.GIS_Y_COOR || station.LNG)
+    };
+    
+    const distanceInKm = calculateHaversineDistance(
+      userLocation.value.latitude,
+      userLocation.value.longitude,
+      coords.lat,
+      coords.lng
+    );
+    
+    // 거리 포맷팅 (km 단위)
+    distanceText = formatDistance(distanceInKm * 1000);
+  }
+  
+  // 기본 정보
+  let content = `
+    <div class="station-info-window ${isLowestPrice(station.PRICE, stations) ? 'lowest-price' : ''}">
+      <h3>
+        ${station.OS_NM}
+        ${isLowestPrice(station.PRICE, stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+      </h3>
+      <p>브랜드: ${getBrandName(station.POLL_DIV_CD)}</p>
+      <p>주소 ${detailData?.OIL[0].NEW_ADR || '주소 정보가 없습니다'}</p>
+      <p>가격: <span class="price-value">${formatPrice(station.PRICE)}원</span></p>
+      ${distanceText ? `<p>거리: ${distanceText}</p>` : ''}
+  `;
+  
+  // 상세 정보가 있는 경우 추가
+  if (detailData) {
+    content += `
+      <div class="detail-info">
+        <h4>상세 정보</h4>
+        ${detailData?.OIL[0].TEL ? `<p>전화번호: ${detailData.OIL[0].TEL}</p>` : ''}
+        <p>경정비 시설: ${detailData?.OIL[0].MAINT_YN === 'Y' ? '있음' : '없음'}</p>
+        <p>세차장: ${detailData?.OIL[0].CAR_WASH_YN === 'Y' ? '있음' : '없음'}</p>
+        <p>편의점: ${detailData?.OIL[0].CVS_YN === 'Y' ? '있음' : '없음'}</p>
+        <p>품질인증: ${detailData?.OIL[0].KPETRO_YN === 'Y' ? '있음' : '없음'}</p>
+      </div>
+    `;
+  }
+  
+  // 로딩 중이거나 상세 정보가 없는 경우
+  if (detailData === undefined) {
+    content += `
+      <div class="detail-info">
+        <p>상세 정보를 불러오는 중...</p>
+      </div>
+    `;
+  }
+  
+  content += `</div>`;
+  
+  return content;
+};
+
 // 지도 초기화
 const initializeMap = async () => {
   try {
@@ -514,41 +599,41 @@ const handleSelectStation = (stationId) => {
 
 // selectedStationId 변경 시 처리
 const showStationInfoWindow = (stationId) => {
-  // 선택된 주유소가 없거나 마커맵에 없는 경우
-  if (!stationId || !markerMap.value[stationId]) return;
+  // 해당 ID의 마커 찾기
+  const marker = markerMap.value[stationId];
+  if (!marker) return;
   
-  // 모든 인포윈도우 닫기
+  // 기존 인포윈도우 닫기
   closeAllInfoWindows();
   
-  const selectedStation = markerMap.value[stationId];
-  const marker = selectedStation.marker;
+  // 해당 주유소 정보 찾기
+  const station = props.fuelStations.find(s => s.UNI_ID === stationId);
+  if (!station) return;
   
-  // 인포윈도우 생성 및 표시
+  // 기본 정보로 인포윈도우 생성
+  const initialContent = createInfoWindowContent(station, props.fuelStations);
+  
   const infoWindow = new window.kakao.maps.InfoWindow({
-    content: selectedStation.infoContent,
+    content: initialContent,
     removable: true,
     zIndex: 10
   });
   
+  // 인포윈도우 열기
   infoWindow.open(map.value, marker);
-  marker.infoWindow = infoWindow;
+  
+  // 활성 인포윈도우 저장
+  activeInfoWindow.value = infoWindow;
+  
+  // 상세 정보 로딩 표시
+  infoWindow.setContent(createInfoWindowContent(station, props.fuelStations, undefined));
+  
+  // 별도 함수로 상세 정보 로딩 처리
+  loadStationDetail(stationId, infoWindow, station, props.fuelStations);
   
   // 지도 중심 이동
-  map.value.setCenter(marker.getPosition());
-  map.value.setLevel(3); // 줌 레벨 설정
-  
-  // 선택된 마커 강조 표시
-  // 모든 가격 오버레이 스타일 초기화
-  Object.values(markerMap.value).forEach(item => {
-    if (item.priceOverlay) {
-      item.priceOverlay.setZIndex(3);
-    }
-  });
-  
-  // 선택된 주유소의 가격 오버레이 강조
-  if (selectedStation.priceOverlay) {
-    selectedStation.priceOverlay.setZIndex(5);
-  }
+  const position = marker.getPosition();
+  map.value.panTo(position);
 };
 
 watch(() => props.selectedStationId, (newStationId) => {
@@ -566,6 +651,26 @@ watch(() => props.selectedStationId, (newStationId) => {
     });
   }
 });
+
+// 주유소 상세 정보 로딩 함수
+const loadStationDetail = async (stationId, infoWindow, station, stations) => {
+  try {
+    // API에서 상세 정보 가져오기
+    const detailData = await fetchStationDetail(stationId);
+    
+    console.log("detailData ", station)
+    console.log("detailData ", detailData)
+    
+    // 상세 정보로 인포윈도우 업데이트
+    infoWindow.setContent(createInfoWindowContent(station, stations, detailData));
+  } catch (error) {
+    console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
+    
+    // 오류 발생 시 기본 정보만 표시
+    const initialContent = createInfoWindowContent(station, stations);
+    infoWindow.setContent(initialContent);
+  }
+};
 
 // 컴포넌트가 마운트될 때 지도 초기화
 onMounted(() => {
@@ -653,26 +758,43 @@ defineExpose({
 
 /* 인포윈도우 스타일 */
 :deep(.station-info-window) {
-  padding: 10px;
-  width: 280px;
+  padding: 15px;
+  width: 300px;
   font-size: 14px;
-  line-height: 1.5;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
   border-radius: 8px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+  line-height: 1.5;
 }
 
 :deep(.station-info-window h3) {
-  margin: 0 0 8px 0;
+  margin-top: 0;
+  margin-bottom: 10px;
   font-size: 16px;
-  font-weight: bold;
-  color: #333;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  font-weight: bold;
+  color: #333;
 }
 
 :deep(.station-info-window p) {
   margin: 5px 0;
+}
+
+:deep(.station-info-window .detail-info) {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+}
+
+:deep(.station-info-window .detail-info h4) {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+:deep(.station-info-window.lowest-price) {
+  border-left: 4px solid #ff6b6b;
 }
 
 :deep(.lowest-price-badge) {
@@ -688,9 +810,5 @@ defineExpose({
 :deep(.price-value) {
   font-weight: bold;
   color: #e53935;
-}
-
-:deep(.station-info-window.lowest-price) {
-  border-left: 4px solid #ffc107;
 }
 </style>

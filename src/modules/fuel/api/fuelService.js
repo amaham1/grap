@@ -7,6 +7,7 @@ import axios from 'axios';
 
 // 상수 정의
 const API_BASE_URL = '/api/opinet/lowTop10.do'; // 프록시 URL로 변경
+const API_DETAIL_URL = '/api/opinet/detailById.do'; // 주유소 상세 정보 API URL
 const API_CODE = 'F250302145';
 
 // 유류 종류 목록
@@ -66,6 +67,33 @@ export const fetchLowestPriceFuelStations = async (prodcd = 'B027', area = '11',
     return [];
   } catch (error) {
     console.error('주유소 정보를 가져오는 중 오류가 발생했습니다:', error);
+    throw error;
+  }
+};
+
+/**
+ * 주유소 상세 정보를 가져오는 함수
+ * @param {string} id - 주유소 ID (UNI_ID)
+ * @returns {Promise} - API 응답 Promise 객체
+ */
+export const fetchFuelStationDetail = async (id) => {
+  try {
+    const response = await axios.get(API_DETAIL_URL, {
+      params: {
+        code: API_CODE,
+        out: 'json',
+        id
+      }
+    });
+    
+    // API 응답에서 주유소 상세 정보 추출
+    if (response.data && response.data.RESULT) {
+      return response.data.RESULT;
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
     throw error;
   }
 };

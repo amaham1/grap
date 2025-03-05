@@ -36,9 +36,6 @@ export const convertKatecToWGS84 = (x, y) => {
     const katecY = y; // 예제 KATEC Y 좌표
 
     const result = katecToWgs84(katecX, katecY);
-    console.log('WGS84 경위도:');
-    console.log(`경도: ${result.longitude}`);
-    console.log(`위도: ${result.latitude}`);
 
     return {
       lat: result.latitude,

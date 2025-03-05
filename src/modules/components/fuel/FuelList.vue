@@ -3,7 +3,7 @@
     <div class="title-section">
       <h1 class="title">반경 내 주유소 정보</h1>
       <button @click="showLowestPriceStations" class="lowest-price-btn">
-        <i class="price-icon">💰</i> 이 지역 최저가 주유소(Top20)
+        <i class="price-icon">💰</i> {{ getSelectedAreaName() }} 최저가 주유소(Top20)
       </button>
     </div>
     
@@ -98,7 +98,7 @@
 
 <script setup>
 import { ref, onMounted, watch, provide, computed } from 'vue';
-import { fetchLowestPriceFuelStations, FUEL_TYPES } from '@/modules/fuel/api/fuelService';
+import { fetchLowestPriceFuelStations, FUEL_TYPES, AREA_CODES } from '@/modules/fuel/api/fuelService';
 import FuelStationCard from './FuelStationCard.vue';
 import FuelFilter from './FuelFilter.vue';
 import FuelListMap from './FuelListMap.vue';
@@ -304,6 +304,12 @@ const showLowestPriceStations = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+// 선택된 지역 이름 가져오기
+const getSelectedAreaName = () => {
+  const area = AREA_CODES.find(area => area.value === selectedArea.value);
+  return area ? area.label : '이 지역';
 };
 
 // 컴포넌트 마운트 시 데이터 로드
