@@ -2,7 +2,9 @@ import { ref } from 'vue';
 import proj4 from 'proj4';
 import axios from 'axios';
 
-const API_BASE_URL = '/api/opinet/aroundAll.do'; // 프록시 URL로 변경
+const API_BASE_URL = import.meta.env.VITE_API_OPINET_BASE_URL 
+  ? 'http://www.opinet.co.kr/api/aroundAll.do' 
+  : '/api/opinet/aroundAll.do'; // 프록시 URL로 변경
 
 /**
  * KATEC 좌표를 WGS84 경위도 좌표로 변환하는 함수

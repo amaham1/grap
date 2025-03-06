@@ -56,6 +56,7 @@
         </button>
       </div>
     </div>
+    <!--
     <div>
       <h2>반경 내 주유소 검색</h2>
       <div class="location-controls">
@@ -79,20 +80,17 @@
         </div>
       </div>
 
-      <!-- 로딩 상태 -->
       <div v-if="isLoading">로딩 중...</div>
 
-      <!-- 에러 메시지 -->
       <div v-else-if="error" style="color: red;">{{ error }}</div>
 
-      <!-- 주유소 목록 -->
       <ul v-else-if="gasStations.length > 0">
         <li v-for="station in gasStations" :key="station.UNI_ID">
           <strong>{{ station.OS_NM }}</strong> - 가격: {{ station.PRICE }}원, 거리: {{ station.DISTANCE }}m
         </li>
       </ul>
       <div v-else>주유소가 없습니다.</div>
-    </div>
+    </div>-->
   </div>
 </template>
 

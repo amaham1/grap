@@ -78,22 +78,31 @@ const clearMarkers = () => {
 
 // 가격 기반 마커 이미지 생성 함수
 const createMarkerImage = (station, allStations, index) => {
-  // 가격 레벨에 따른 색상 결정
-  const color = getPriceColor(parseFloat(station.PRICE), allStations);
-  
   // 최저가 주유소 확인
   const isLowestPriceStation = isLowestPrice(station.PRICE, allStations);
   
-  // SVG 마커 생성 (최저가일 경우 별표 추가)
-  const svgMarker = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="36" height="48" viewBox="0 0 36 48">
-      <path fill="${color}" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
-      <circle fill="white" cx="18" cy="18" r="8"/>
-      ${isLowestPriceStation ? `
-        <path fill="gold" d="M18 8l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>
-      ` : ''}
-    </svg>
-  `;
+  // SVG 마커 생성 (최저가일 경우 다른 모양으로 표시)
+  let svgMarker;
+  
+  if (isLowestPriceStation) {
+    // 최저가 주유소 마커 (파스텔톤 색상)
+    svgMarker = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="32" viewBox="0 0 36 48">
+        <path fill="#FFB6C1" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
+        <circle fill="white" cx="18" cy="18" r="8"/>
+        <path fill="#FFC0CB" d="M18 8l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>
+      </svg>
+    `;
+  } else {
+    // 일반 주유소 마커 (모두 동일한 마커 사용)
+    svgMarker = `
+      <svg xmlns="http://www.w3.org/2000/svg" width="22" height="32" viewBox="0 0 36 48">
+        <path fill="#4CAF50" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
+        <circle fill="white" cx="18" cy="18" r="8"/>
+        <path fill="#4CAF50" d="M22 18c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4 4 1.8 4 4z"/>
+      </svg>
+    `;
+  }
   
   // SVG를 Base64로 인코딩
   const encodedSvg = window.btoa(svgMarker);
@@ -101,7 +110,7 @@ const createMarkerImage = (station, allStations, index) => {
   // 마커 이미지 생성
   return new window.kakao.maps.MarkerImage(
     'data:image/svg+xml;base64,' + encodedSvg,
-    new window.kakao.maps.Size(36, 48),
+    new window.kakao.maps.Size(25, 36),
     { offset: new window.kakao.maps.Point(18, 48) }
   );
 };
@@ -183,9 +192,9 @@ const createStationMarkers = async (stations, bounds) => {
       const marker = new window.kakao.maps.Marker({
         map: map.value,
         position: position,
-        image: defaultMarkerImage.value,
+        image: markerImage, // 커스텀 마커 이미지 사용
         title: station.OS_NM,
-        zIndex: isLowestPrice(station.PRICE, stations) ? 2 : 1,
+        zIndex: isLowestPrice(station.PRICE, stations) ? 5 : 1, // 최저가 주유소는 더 높은 zIndex로 설정
         clickable: true // 클릭 가능하도록 설정
       });
       
@@ -344,11 +353,18 @@ const showUserLocation = async () => {
     // 사용자 위치 정보 저장
     userLocation.value = { latitude, longitude };
     
-    // 사용자 위치 마커 이미지 생성
+    // 사용자 위치 마커 이미지 생성 (파란색 마커로 변경)
     const markerImage = new window.kakao.maps.MarkerImage(
-      'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-      new window.kakao.maps.Size(24, 35),
-      { offset: new window.kakao.maps.Point(12, 35) }
+      // 현재 위치를 나타내는 파란색 마커 이미지 사용
+      'data:image/svg+xml;base64,' + window.btoa(`
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="35" viewBox="0 0 36 48">
+          <path fill="#2196F3" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
+          <circle fill="white" cx="18" cy="18" r="8"/>
+          <path fill="#2196F3" d="M18 14c2.2 0 4 1.8 4 4s-1.8 4-4 4-4-1.8-4-4 1.8-4 4-4z"/>
+        </svg>
+      `),
+      new window.kakao.maps.Size(35, 45),
+      { offset: new window.kakao.maps.Point(18, 48) }
     );
     
     // 사용자 위치 마커 생성
@@ -356,7 +372,7 @@ const showUserLocation = async () => {
       map: map.value,
       position: new window.kakao.maps.LatLng(latitude, longitude),
       image: markerImage,
-      zIndex: 3, // 다른 마커보다 위에 표시
+      zIndex: 10, // 다른 마커보다 위에 표시 (더 높은 값으로 설정)
       title: '내 위치'
     });
     
@@ -582,7 +598,7 @@ const initializeMap = async () => {
     // 기본 마커 이미지 생성
     defaultMarkerImage.value = new window.kakao.maps.MarkerImage(
       'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-      new window.kakao.maps.Size(24, 35)
+      new window.kakao.maps.Size(22, 36)
     );
     
     // 선택된 마커 이미지 생성 (다른 색상의 마커)
@@ -590,6 +606,9 @@ const initializeMap = async () => {
       'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png', 
       new window.kakao.maps.Size(24, 35)
     );
+    
+    // 지도 클릭 이벤트 리스너 등록
+    window.kakao.maps.event.addListener(map.value, 'click', handleMapClick);
     
     // 마커 생성
     await createMarkers();
@@ -599,6 +618,21 @@ const initializeMap = async () => {
     console.error('지도 초기화 중 오류 발생:', error);
     loading.value = false;
   }
+};
+
+// 지도 클릭 이벤트 처리 함수
+const handleMapClick = () => {
+  // 클릭 시 열려있는 인포윈도우 닫기
+  closeAllInfoWindows();
+  
+  // 활성화된 마커가 있으면 기본 이미지로 변경
+  if (activeMarker.value) {
+    activeMarker.value.setImage(defaultMarkerImage.value);
+    activeMarker.value = null;
+  }
+  
+  // 선택된 주유소 ID 초기화
+  emit('select-station', null);
 };
 
 // 지역 변경 시 지도 중심 변경

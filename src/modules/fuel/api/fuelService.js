@@ -6,8 +6,12 @@
 import axios from 'axios';
 
 // 상수 정의
-const API_BASE_URL = '/api/opinet/lowTop10.do'; // 프록시 URL로 변경
-const API_DETAIL_URL = '/api/opinet/detailById.do'; // 주유소 상세 정보 API URL
+const API_BASE_URL = import.meta.env.VITE_API_OPINET_BASE_URL 
+  ? 'http://www.opinet.co.kr/api/lowTop10.do' 
+  : '/api/opinet/lowTop10.do';
+const API_DETAIL_URL = import.meta.env.VITE_API_OPINET_BASE_URL 
+  ? 'http://www.opinet.co.kr/api/detailById.do' 
+  : '/api/opinet/detailById.do'; // 주유소 상세 정보 API URL
 const API_CODE = 'F250302145';
 
 // 유류 종류 목록
