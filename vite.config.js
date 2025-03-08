@@ -21,7 +21,7 @@ export default defineConfig({
       '/api/opinet': {
         target: 'http://www.opinet.co.kr',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/opinet/, '/api')
+        rewrite: (path) => path.replace(/^\/api\/opinet/, '')
       },
       // 카카오 API 프록시 설정
       '/api/kakao': {

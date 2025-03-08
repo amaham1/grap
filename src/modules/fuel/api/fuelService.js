@@ -6,7 +6,7 @@
 import axios from 'axios';
 
 // 상수 정의
-const API_BASE_URL = `${import.meta.env.VITE_API_BASE_URL}/api/opinet`; // WAS 서버 URL
+const API_BASE_URL = import.meta.env.VITE_API_OPINET_BASE_URL || '/api/opinet';
 const API_CODE = 'F250302145';
 
 // 유류 종류 목록
@@ -77,7 +77,7 @@ export const fetchLowestPriceFuelStations = async (prodcd = 'B027', area = '11',
  */
 export const fetchFuelStationDetail = async (id) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/detailById.do`, {
+    const response = await axios.get(`${API_BASE_URL}/detailById.do`, {
       params: {
         code: API_CODE,
         out: 'json',
@@ -100,7 +100,7 @@ export const fetchFuelStationDetail = async (id) => {
 // 주변 주유소 검색
 export const searchNearbyStations = async (x, y, radius = 5000) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/api/aroundAll.do`, {
+    const response = await axios.get(`${API_BASE_URL}/aroundAll.do`, {
       params: {
         x,
         y,
