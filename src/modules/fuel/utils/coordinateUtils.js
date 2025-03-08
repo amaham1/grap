@@ -62,71 +62,108 @@ export const isValidCoordinate = (x, y) => {
   return x && y && !isNaN(x) && !isNaN(y);
 };
 
+/**
+ * 두 지점 사이의 선을 지정된 개수로 나누어 각 지점의 좌표를 반환하는 함수
+ * @param {Object} start - 시작점 좌표 {lat: number, lng: number}
+ * @param {Object} end - 끝점 좌표 {lat: number, lng: number}
+ * @param {number} segments - 분할할 구간 수
+ * @returns {Array<Object>} - 분할된 지점들의 좌표 배열 [{lat: number, lng: number}, ...]
+ */
+export const divideLineIntoPoints = (start, end, segments = 10) => {
+  const points = [];
+  
+  for (let i = 0; i <= segments; i++) {
+    const ratio = i / segments;
+    const lat = start.lat + (end.lat - start.lat) * ratio;
+    const lng = start.lng + (end.lng - start.lng) * ratio;
+    points.push({ lat, lng });
+  }
+  
+  return points;
+};
+
 export function useGasStationFinder() {
-  const apiKey = ref('F250302145'); // Opinet에서 발급받은 API 키로 대체
-  const gasStations = ref([]); // 주유소 목록
-  const isLoading = ref(false); // 로딩 상태
-  const error = ref(null); // 에러 메시지
+  const apiKey = ref('F250302145');
+  const gasStations = ref([]);
+  const isLoading = ref(false);
+  const error = ref(null);
 
   // WGS84에서 KATEC으로 변환
   const convertToKATEC = (longitude, latitude) => {
-      if (typeof longitude !== 'number' || typeof latitude !== 'number') {
-          throw new Error('경도와 위도는 숫자여야 합니다.');
-      }
-      
-      const point = proj4('EPSG:4326', 'KATEC', [longitude, latitude]);
-      
-      return { x: point[0], y: point[1] };
+    if (typeof longitude !== 'number' || typeof latitude !== 'number') {
+      throw new Error('경도와 위도는 숫자여야 합니다.');
+    }
+    
+    const point = proj4('EPSG:4326', 'KATEC', [longitude, latitude]);
+    
+    return { x: point[0], y: point[1] };
   };
 
   // KATEC 좌표계 정의
   proj4.defs('KATEC', '+proj=tmerc +lat_0=38 +lon_0=128 +k=0.9999 +x_0=400000 +y_0=600000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43');
 
   // 반경 내 주유소 정보 가져오기
-  const fetchGasStations = async (longitude, latitude, radius = 5000, prodcd = 'B027', sort = 1) => {
-      isLoading.value = true;
-      error.value = null;
+  const fetchGasStations = async (longitude, latitude, radius = 1000, prodcd = 'B027', sort = 1) => {
+    if (radius > 5000) {
+      throw new Error('검색 반경은 최대 5km(5000m)를 초과할 수 없습니다.');
+    }
 
-      try {
-          const katecCoords = convertToKATEC(longitude, latitude);
-          
-          const response = await axios.get(API_BASE_URL, {
-              params: {
-                  code: apiKey.value,
-                  x: katecCoords.x,
-                  y: katecCoords.y,
-                  radius, // 검색 반경 (최대 5000m)
-                  prodcd, // 연료 타입 (B027: 휘발유)
-                  sort,   // 정렬 방식 (1: 거리순)
-                  out: 'json' // 응답 형식
-              }
-          });
+    isLoading.value = true;
+    error.value = null;
 
-          if (response.data.RESULT && response.data.RESULT.OIL) {
-              // 주유소 데이터를 먼저 가격순으로 정렬하고, 가격이 같으면 거리순으로 정렬
-              gasStations.value = response.data.RESULT.OIL
-                .sort((a, b) => {
-                  // 가격 비교 (오름차순)
-                  const priceA = parseFloat(a.PRICE) || Number.MAX_VALUE;
-                  const priceB = parseFloat(b.PRICE) || Number.MAX_VALUE;
-                  
-                  if (priceA !== priceB) {
-                    return priceA - priceB; // 가격 오름차순
-                  }
-                  
-                  // 가격이 같으면 거리로 정렬 (오름차순)
-                  return parseFloat(a.DISTANCE) - parseFloat(b.DISTANCE);
-                });
-          } else {
-              throw new Error('주유소 데이터를 찾을 수 없습니다.');
-          }
-      } catch (err) {
-        
-          error.value = err.message || 'API 요청 중 오류가 발생했습니다.';
-      } finally {
-          isLoading.value = false;
+    try {
+      const katecCoords = convertToKATEC(longitude, latitude);
+      
+      const response = await axios.get(API_BASE_URL, {
+        params: {
+          code: apiKey.value,
+          x: katecCoords.x,
+          y: katecCoords.y,
+          radius,
+          prodcd,
+          sort,
+          out: 'json'
+        }
+      });
+
+      if (response.data.RESULT && response.data.RESULT.OIL) {
+        // 주유소 데이터 정렬 (가격 오름차순, 같은 가격은 거리 오름차순)
+        gasStations.value = response.data.RESULT.OIL
+          .sort((a, b) => {
+            const priceA = parseFloat(a.PRICE) || Number.MAX_VALUE;
+            const priceB = parseFloat(b.PRICE) || Number.MAX_VALUE;
+            
+            if (priceA !== priceB) {
+              return priceA - priceB;
+            }
+            
+            return parseFloat(a.DISTANCE) - parseFloat(b.DISTANCE);
+          })
+          .map(station => ({
+            ...station,
+            PRICE: station.PRICE ? parseInt(station.PRICE).toLocaleString() : '정보없음',
+            DISTANCE: parseFloat(station.DISTANCE)
+          }));
+      } else {
+        throw new Error('주유소 데이터를 찾을 수 없습니다.');
       }
+    } catch (err) {
+      error.value = err.message || 'API 요청 중 오류가 발생했습니다.';
+      gasStations.value = [];
+    } finally {
+      isLoading.value = false;
+    }
+
+    return {
+      stations: gasStations.value,
+      error: error.value
+    };
   };
 
-  return { gasStations, isLoading, error, fetchGasStations };
+  return {
+    gasStations,
+    isLoading,
+    error,
+    fetchGasStations
+  };
 }

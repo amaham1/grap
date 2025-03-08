@@ -1,5 +1,5 @@
 <template>
-  <div v-if="location" class="user-location-info">
+  <!-- <div v-if="location" class="user-location-info">
     <div class="location-header">
       <i class="location-icon">📍</i>
       <span>현재 위치</span>
@@ -8,7 +8,7 @@
       <p>위도: {{ location.latitude.toFixed(6) }}</p>
       <p>경도: {{ location.longitude.toFixed(6) }}</p>
     </div>
-  </div>
+  </div> -->
 </template>
 
 <script setup>
