@@ -38,6 +38,12 @@ export default defineConfig({
             }
           });
         }
+      },
+      // cafe24 API 프록시 설정
+      '/api/cafe24': {
+        target: 'https://grap.co.kr',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/cafe24/, '/api')
       }
     }
   }

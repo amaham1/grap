@@ -44,10 +44,6 @@
   </modern-layout>
 </template>
 
-<script setup>
-import ModernLayout from '@/modules/components/ui/ModernLayout.vue';
-</script>
-
 <style scoped>
 .nav-links, .mobile-nav-links {
   display: flex;

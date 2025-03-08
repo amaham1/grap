@@ -1,7 +1,6 @@
 import { ref } from 'vue';
 import proj4 from 'proj4';
 import axios from 'axios';
-
 const API_BASE_URL = import.meta.env.VITE_API_OPINET_BASE_URL 
   ? 'http://www.opinet.co.kr/api/aroundAll.do' 
   : '/api/opinet/aroundAll.do'; // 프록시 URL로 변경
