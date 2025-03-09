@@ -71,7 +71,7 @@ const formatPrice = (price) => {
 // 브랜드별 마커 이미지 생성 함수
 const createMarkerImage = (station) => {
   // 가격에 따른 색상 결정
-  const color = getPriceColor(parseFloat(station.PRICE), props.allStations);
+  const color = getPriceColor(parseFloat(station.PRICE), props.totalStations);
   
   // SVG 마커 생성
   const svgMarker = `

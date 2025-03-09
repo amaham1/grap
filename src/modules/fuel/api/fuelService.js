@@ -77,7 +77,7 @@ export const fetchLowestPriceFuelStations = async (prodcd = 'B027', area = '11',
  */
 export const fetchFuelStationDetail = async (id) => {
   try {
-    const response = await axios.get(`${API_BASE_URL}/detailById.do`, {
+    const response = await axios.get(`${API_BASE_URL}/api/detailById.do`, {
       params: {
         code: API_CODE,
         out: 'json',
@@ -94,29 +94,5 @@ export const fetchFuelStationDetail = async (id) => {
   } catch (error) {
     console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
     throw error;
-  }
-};
-
-// 주변 주유소 검색
-export const searchNearbyStations = async (x, y, radius = 5000) => {
-  try {
-    const response = await axios.get(`${API_BASE_URL}/aroundAll.do`, {
-      params: {
-        x,
-        y,
-        radius,
-        prodcd: 'B027',
-        sort: '1',
-        out: 'json'
-      }
-    });
-
-    if (response.data && response.data.RESULT) {
-      return response.data.RESULT.OIL;
-    }
-    return [];
-  } catch (error) {
-    console.error('주유소 검색 오류:', error);
-    throw new Error('주유소 검색 중 오류가 발생했습니다.');
   }
 };
