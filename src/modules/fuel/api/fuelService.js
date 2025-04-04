@@ -11,11 +11,10 @@ const API_CODE = 'F250302145';
 
 // 유류 종류 목록
 export const FUEL_TYPES = [
-  { value: 'B027', label: '휘발유' },
-  { value: 'D047', label: '경유' },
-  { value: 'B034', label: '고급휘발유' },
-  { value: 'C004', label: '실내등유' },
-  { value: 'K015', label: '자동차부탄' }
+  { value: 'gasoline', label: '휘발유' },
+  { value: 'diesel', label: '경유' },
+  { value: 'premium_gasoline', label: '고급휘발유' },
+  { value: 'lpg', label: 'LPG' }
 ];
 
 // 지역 코드 목록 (한글 이름 기준 가나다 순 정렬)
@@ -41,12 +40,12 @@ export const AREA_CODES = [
 
 /**
  * 지역별 최저가 주유소 목록을 가져오는 함수
- * @param {string} prodcd - 제품 코드 (기본값: 'B027' 휘발유)
+ * @param {string} prodcd - 제품 코드 (기본값: 'gasoline' 휘발유)
  * @param {string} area - 지역 코드 (기본값: '11' 제주)
  * @param {number} cnt - 결과 개수 (기본값: 20)
  * @returns {Promise} - API 응답 Promise 객체
  */
-export const fetchLowestPriceFuelStations = async (prodcd = 'B027', area = '11', cnt = 20) => {
+export const fetchLowestPriceFuelStations = async (prodcd = 'gasoline', area = '11', cnt = 20) => {
   try {
     const response = await axios.get(`${API_BASE_URL}/api/lowTop10.do`, {
       params: {

@@ -1,25 +1,21 @@
 <template>
   <div 
     class="fuel-station-card" 
-    :class="[
-      { 'selected': selected }, 
-      { 'lowest-price': isLowestPrice }, 
-      `price-level-${getPriceLevel(station.PRICE, allStations)}`
-    ]"
     @click="handleCardClick"
   >
     <div class="station-header">
       <div class="station-name">
-        {{ station.OS_NM }}
+        {{ gasStations.osnm }}
         <span v-if="isLowestPrice" class="lowest-price-badge">최저가</span>
       </div>
-      <div class="station-brand">{{ getBrandName(station.POLL_DIV_CD) }}</div>
+      <div class="station-brand">{{ getBrandName(gasStations.poll) }}</div>
     </div>
     <div class="station-info">
-      <div class="station-price">{{ formatPrice(station.PRICE) }}원</div>
-      <div class="station-address">{{ station.NEW_ADR || station.VAN_ADR }}</div>
+      {{  }}
+      <div class="station-price">{{ formatPrice(gasStations.fuelPrices['gasoline']) }}원</div>
+      <div class="station-address">{{ gasStations.osnm || '이름없음' }}</div>
       <div v-if="distance !== null" class="station-distance">
-        <i class="station-distance-icon">📍</i>현재 위치에서 : {{ (station.DISTANCE / 1000).toFixed(1) }} km
+        <i class="station-distance-icon">📍</i>현재 위치에서 : {{ (gasStations.distance / 1000).toFixed(1) }} km
       </div>
       <div v-if="wgs84Coords" class="station-coords">
         <i class="station-coords-icon">🌐</i>WGS84 좌표: {{ wgs84Coords.lat.toFixed(6) }}, {{ wgs84Coords.lng.toFixed(6) }}
@@ -29,17 +25,14 @@
 </template>
 
 <script>
-import { ref, onMounted, computed, watch, inject } from 'vue';
+import { ref } from 'vue';
 import { getBrandName } from '@/modules/fuel/utils/brandUtils';
-import { getPriceColor, getPriceLevel, isLowestPrice } from '@/modules/fuel/utils/colorUtils';
-import { getCurrentLocation, formatDistance, calculateHaversineDistance } from '@/modules/fuel/api/kakaoMobilityService';
-import { getCoordinatesByAddress } from '@/modules/fuel/api/kakaoMapService';
-import { convertKatecToWGS84 } from '@/modules/fuel/utils/coordinateUtils';
+import { getPriceLevel, isLowestPrice } from '@/modules/fuel/utils/colorUtils';
 
 export default {
   name: 'FuelStationCard',
   props: {
-    station: {
+    gasStations: {
       type: Object,
       required: true
     },
@@ -54,17 +47,23 @@ export default {
     userLocation: {
       type: Object,
       default: null
+    },
+    selectedFuelType: {
+      type: String,
+      default: 'gasoline'
     }
   },
   emits: ['select-station', 'show-infowindow'],
   setup(props, { emit }) {
+    console.log(props.gasStations)
     // 가격 포맷팅 함수
     const formatPrice = (price) => {
+      if (!price) return '정보 없음';
       return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     };
     
     // 최저가 여부 계산
-    const stationIsLowestPrice = isLowestPrice(props.station.PRICE, props.allStations);
+    // const stationIsLowestPrice = isLowestPrice(props.gasStations.fuelPrices, props.allStations);
     
     // 거리 정보 상태
     const distance = ref(null);
@@ -74,104 +73,15 @@ export default {
     
     // 카드 클릭 이벤트 핸들러
     const handleCardClick = () => {
-      emit('select-station', props.station.UNI_ID);
-      emit('show-infowindow', props.station);
+      emit('select-station', props.gasStations.UNI_ID);
+      emit('show-infowindow', props.gasStations);
     };
-    
-    // 거리 계산 함수
-    const calculateStationDistance = async () => {
-      try {
-        // 사용자 위치가 props로 전달되었는지 확인
-        let userLocation = props.userLocation;
-        
-        // props로 전달되지 않았다면 현재 위치 가져오기
-        if (!userLocation) {
-          userLocation = await getCurrentLocation();
-        }
-        
-        // 주유소 좌표 확인
-        let stationLat, stationLng;
-        
-        // 주유소 객체에 GIS_X_COOR와 GIS_Y_COOR 필드가 있는지 확인 (KATEC 좌표)
-        if (props.station.GIS_X_COOR && props.station.GIS_Y_COOR) {
-          // KATEC 좌표를 WGS84로 변환
-          const katecX = parseFloat(props.station.GIS_X_COOR);
-          const katecY = parseFloat(props.station.GIS_Y_COOR);
-          
-          const wgs84 = convertKatecToWGS84(katecX, katecY);
-          if (wgs84) {
-            stationLat = wgs84.lat;
-            stationLng = wgs84.lng;
-            wgs84Coords.value = wgs84;
-          }
-        } 
-        // 주유소 객체에 LAT, LNG 필드가 있는지 확인
-        else if (props.station.LAT && props.station.LNG) {
-          stationLat = parseFloat(props.station.LAT);
-          stationLng = parseFloat(props.station.LNG);
-          wgs84Coords.value = { lat: stationLat, lng: stationLng };
-        }
-        // 주소로 좌표 변환
-        else {
-          const address = props.station.NEW_ADR || props.station.VAN_ADR;
-          if (!address) {
-            distance.value = '주소 정보 없음';
-            return;
-          }
-          
-          // 카카오 API로 주소를 좌표로 변환
-          const stationCoords = await getCoordinatesByAddress(address);
-          if (!stationCoords) {
-            distance.value = '좌표 변환 실패';
-            return;
-          }
-          
-          stationLat = stationCoords.lat;
-          stationLng = stationCoords.lng;
-          wgs84Coords.value = stationCoords;
-        }
-        
-        // 하버사인 공식으로 직선 거리 계산 (km)
-        const distanceInKm = calculateHaversineDistance(
-          userLocation.latitude, 
-          userLocation.longitude,
-          stationLat, 
-          stationLng
-        );
-        
-        // 미터 단위로 변환
-        const distanceInMeters = distanceInKm * 1000;
-        
-        // 거리 포맷팅
-        distance.value = formatDistance(distanceInMeters);
-      } catch (error) {
-        console.error('거리 계산 중 오류 발생:', error);
-        distance.value = '거리 정보 없음';
-      }
-    };
-    
-    // 컴포넌트 마운트 시 거리 계산
-    onMounted(() => {
-      calculateStationDistance();
-    });
-    
-    // userLocation이 변경될 때 거리 재계산
-    watch(() => props.userLocation, (newLocation) => {
-      if (newLocation) {
-        calculateStationDistance();
-      }
-    });
-    
-    // station이 변경될 때 거리 재계산
-    watch(() => props.station, (newStation) => {
-      calculateStationDistance();
-    }, { deep: true });
 
     return {
       getBrandName,
       getPriceLevel,
       formatPrice,
-      isLowestPrice: stationIsLowestPrice,
+      isLowestPrice: false,
       distance,
       wgs84Coords,
       handleCardClick

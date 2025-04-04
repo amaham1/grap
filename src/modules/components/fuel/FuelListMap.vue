@@ -20,6 +20,15 @@
           step="0.5"
         >
       </div>
+      <div class="fuel-type-filter">
+        <label>유류 종류:</label>
+        <select v-model="selectedFuelType" @change="changeFuelType">
+          <option value="gasoline">휘발유</option>
+          <option value="premium_gasoline">고급유</option>
+          <option value="diesel">경유</option>
+          <option value="lpg">LPG</option>
+        </select>
+      </div>
     </div>
     <div v-if="dividePoints.length > 0" class="divide-points">
       <h3>분할 지점 좌표 및 주변 주유소</h3>
@@ -51,17 +60,15 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch, defineProps, defineEmits } from 'vue';
-import { getBrandName } from '@/modules/fuel/utils/brandUtils';
-import { calculateHaversineDistance } from '@/modules/fuel/api/kakaoMobilityService';
 import { fetchFuelStationDetail } from '@/modules/fuel/api/fuelService';
 import { initKakaoMap } from '@/api/kakaoMapApi';
-import { getCoordinatesByAddress } from '@/modules/fuel/api/kakaoMapService';
-import { getPriceColor, isLowestPrice } from '@/modules/fuel/utils/colorUtils';
-import { formatDistance, getCurrentLocation } from '@/modules/fuel/api/kakaoMobilityService';
+import { isLowestPrice } from '@/modules/fuel/utils/colorUtils';
+import { getCurrentLocation } from '@/modules/fuel/api/kakaoMobilityService';
 import { convertKatecToWGS84 } from '@/modules/fuel/utils/coordinateUtils';
 import { divideLineIntoPoints } from '@/modules/fuel/utils/coordinateUtils';
 import UserLocationDisplay from '@/modules/components/common/UserLocationDisplay.vue';
 import { useGasStationFinder } from '@/modules/fuel/utils/coordinateUtils';
+import axios from 'axios';
 
 const props = defineProps({
   fuelStations: {
@@ -102,6 +109,7 @@ const polyline = ref(null);
 const dividePoints = ref([]);
 const pointStations = ref([]);
 const selectedStationId = ref(null);
+const selectedFuelType = ref('gasoline'); // 기본값: 휘발유
 
 // 사용자 위치 정보
 const userLocation = ref(null);
@@ -137,30 +145,30 @@ const clearMarkers = () => {
   markerMap.value = {};
 };
 
-// 가격 기반 마커 이미지 생성 함수
-const createMarkerImage = (station, allStations, index) => {
+// 마커 이미지 생성 함수
+const createMarkerImage = (station, stations, index) => {
   // 최저가 주유소 확인
-  const isLowestPriceStation = isLowestPrice(station.PRICE, allStations);
+  const isLowestPriceStation = checkIfLowestPrice(station, stations);
   
   // SVG 마커 생성 (최저가일 경우 다른 모양으로 표시)
   let svgMarker;
   
   if (isLowestPriceStation) {
-    // 최저가 주유소 마커 (파스텔톤 색상)
+    // 최저가 주유소 마커 (빨간색 계열)
     svgMarker = `
       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="32" viewBox="0 0 36 48">
-        <path fill="#FFB6C1" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
+        <path fill="#FF5722" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
         <circle fill="white" cx="18" cy="18" r="8"/>
-        <path fill="#FFC0CB" d="M18 8l3 6 7 1-5 5 1 7-6-3-6 3 1-7-5-5 7-1z"/>
+        <text x="18" y="22" text-anchor="middle" font-size="12" font-weight="bold" fill="#FF5722">$</text>
       </svg>
     `;
   } else {
-    // 일반 주유소 마커 (모두 동일한 마커 사용)
+    // 일반 주유소 마커 (파란색 계열)
     svgMarker = `
       <svg xmlns="http://www.w3.org/2000/svg" width="22" height="32" viewBox="0 0 36 48">
-        <path fill="#4CAF50" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
+        <path fill="#2196F3" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
         <circle fill="white" cx="18" cy="18" r="8"/>
-        <path fill="#4CAF50" d="M22 18c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4 4 1.8 4 4z"/>
+        <text x="18" y="22" text-anchor="middle" font-size="12" font-weight="bold" fill="#2196F3">P</text>
       </svg>
     `;
   }
@@ -171,9 +179,32 @@ const createMarkerImage = (station, allStations, index) => {
   // 마커 이미지 생성
   return new window.kakao.maps.MarkerImage(
     'data:image/svg+xml;base64,' + encodedSvg,
-    new window.kakao.maps.Size(25, 36),
-    { offset: new window.kakao.maps.Point(18, 48) }
+    new window.kakao.maps.Size(22, 32),
+    { offset: new window.kakao.maps.Point(11, 32) }
   );
+};
+
+// 최저가 주유소 확인 함수
+const checkIfLowestPrice = (station, stations) => {
+  if (!station.fuelPrices || !stations || !stations.length) return false;
+  
+  // 휘발유 가격이 있는 주유소만 필터링
+  const stationsWithGasoline = stations.filter(s => 
+    s.fuelPrices && 
+    s.fuelPrices.gasoline && 
+    s.fuelPrices.gasoline > 0
+  );
+  
+  // 휘발유 가격이 있는 주유소가 없으면 false 반환
+  if (!stationsWithGasoline.length) return false;
+  
+  // 최저 휘발유 가격 찾기
+  const lowestGasolinePrice = Math.min(
+    ...stationsWithGasoline.map(s => s.fuelPrices.gasoline)
+  );
+  
+  // 현재 주유소가 최저가인지 확인
+  return station.fuelPrices.gasoline === lowestGasolinePrice;
 };
 
 // 주유소 마커 이미지 생성 함수
@@ -182,7 +213,7 @@ const createStationMarkerImage = () => {
     <svg xmlns="http://www.w3.org/2000/svg" width="22" height="32" viewBox="0 0 36 48">
       <path fill="#4169E1" d="M18 0C8.1 0 0 8.1 0 18c0 10.8 18 30 18 30s18-19.2 18-30c0-9.9-8.1-18-18-18z"/>
       <circle fill="white" cx="18" cy="18" r="8"/>
-      <path fill="#4169E1" d="M22 18c0 2.2-1.8 4-4 4s-4-1.8-4-4 1.8-4 4-4 4 1.8 4 4z"/>
+      <path fill="#4169E1" d="M22 18c2.2 0 4 1.8 4 4s-1.8 4-4 4-4-1.8-4-4 1.8-4 4-4z"/>
     </svg>
   `;
   
@@ -212,7 +243,7 @@ const createSelectedStationMarkerImage = () => {
 };
 
 // 마커 생성 함수
-const createMarkers = async () => {
+const fnCreateStationMarkers = async () => {
   // 기존 마커 제거
   clearMarkers();
   
@@ -228,247 +259,555 @@ const createMarkers = async () => {
   
   // 주유소 마커 생성 함수 호출
   await createStationMarkers(props.fuelStations, bounds);
-  
-  // 모든 마커가 보이도록 지도 범위 조정
-  if (markers.value.length > 0) {
-    map.value.setBounds(bounds);
-  }
 };
 
-// 주유소 마커 생성 함수 (모듈화)
-const createStationMarkers = (stations, bounds) => {
-  // 마커 생성 작업 배열
-  const markerPromises = [];
-  
-  // 각 주유소에 대한 마커 생성
-  for (const [index, station] of stations.entries()) {
-    try {
-      let coords = null;
-      
-      // 1. 주유소 객체에 GIS_X_COOR와 GIS_Y_COOR 필드가 있는지 확인 (KATEC 좌표)
-      if (station.GIS_X_COOR && station.GIS_Y_COOR) {
-        // KATEC 좌표를 WGS84로 변환
-        const katecX = parseFloat(station.GIS_X_COOR);
-        const katecY = parseFloat(station.GIS_Y_COOR);
+//카카오맵 주유소 마커 생성 함수 (모듈화)
+const createStationMarkers = async (stations) => {
+  if (!stations || !stations.length) {
+    console.log('주유소 데이터가 없습니다.');
+    return [];
+  }
+
+  try {
+    // 연료 가격 정보 가져오기
+    const fuelPrices = await fetchFuelPrices(stations.map(station => station.id));
+    // 주유소 ID별 연료 가격 매핑
+    const fuelPriceMap = {};
+    if (fuelPrices && fuelPrices.info && Array.isArray(fuelPrices.info)) {
+      fuelPrices.info.forEach(item => {
+        if (!item || !item.id) return;
         
-        const wgs84 = convertKatecToWGS84(katecX, katecY);
-        if (wgs84) {
-          coords = {
-            lat: wgs84.lat,
-            lng: wgs84.lng
-          };
-        }
-      } 
-      // 2. 주유소 객체에 LAT, LNG 필드가 있는지 확인
-      else if (station.LAT && station.LNG) {
-        coords = {
-          lat: parseFloat(station.LAT),
-          lng: parseFloat(station.LNG)
+        const id = item.id;
+        // 연료 가격 정보 구조화
+        fuelPriceMap[id] = {
+          gasoline: parseFloat(item.gasoline) || 0,          // 휘발유
+          premium_gasoline: parseFloat(item.premium_gasoline) || 0, // 고급유
+          diesel: parseFloat(item.diesel) || 0,          // 경유
+          lpg: parseFloat(item.lpg) || 0            // LPG
+        };
+      });
+    }
+    
+    // 주유소 데이터에 연료 가격 정보 추가
+    const stationsWithPrices = stations.map(station => {
+      const stationId = station.id;
+      if (stationId && fuelPriceMap[stationId]) {
+        return {
+          ...station,
+          fuelPrices: fuelPriceMap[stationId]
         };
       }
-      // 3. 위경도 정보가 없는 경우 주소로 좌표 변환 (기존 방식)
-      else {
-        const address = station.NEW_ADR || station.VAN_ADR;
-        if (!address) continue;
-        
-        // 주소 기반 좌표 변환은 비동기로 처리하지만 마커 생성은 나중에 일괄 처리
-        markerPromises.push(
-          getCoordinatesByAddress(address).then(addressCoords => {
-            if (!addressCoords) return null;
-            return createMarkerWithCoords(station, addressCoords, stations, index, bounds);
-          })
-        );
-        continue; // 주소 기반 좌표는 비동기로 처리하므로 다음 주유소로 넘어감
+      // 가격 정보가 없는 경우 빈 객체 추가
+      return {
+        ...station,
+        fuelPrices: {
+          gasoline: 0,
+          premium_gasoline: 0,
+          diesel: 0,
+          lpg: 0
+        }
+      };
+    });
+    
+    // 마커 생성을 위한 경계 객체 생성
+    const markerBounds = new window.kakao.maps.LatLngBounds();
+
+    // 각 주유소에 대한 마커 생성
+    for (let i = 0; i < stationsWithPrices.length; i++) {
+      const station = stationsWithPrices[i];
+      
+      // 선택된 유류 종류에 따라 필터링
+      if (selectedFuelType.value) {
+        // 선택된 유류 종류의 가격이 0인 경우 마커 생성 건너뛰기
+        if (!station.fuelPrices || station.fuelPrices[selectedFuelType.value] <= 0) {
+          continue;
+        }
       }
       
-      // 좌표가 없으면 다음 주유소로
-      if (!coords) continue;
+      // 좌표 변환 (KATEC -> WGS84)
+      const coords = station.gisxcoor && station.gisycoor
+        ? convertKatecToWGS84(parseFloat(station.gisxcoor), parseFloat(station.gisycoor))
+        : null;
       
-      // 좌표가 있는 경우 바로 마커 생성
-      createMarkerWithCoords(station, coords, stations, index, bounds);
-    } catch (error) {
-      console.error(`주유소 마커 생성 중 오류 발생 (${station.OS_NM}):`, error);
+      if (!coords) {
+        console.warn(`주유소 ${station.osnm || '알 수 없음'}의 좌표 변환 실패`);
+        continue;
+      }
+      
+      try {
+        // 마커 생성
+        const { marker, infoWindow } = createMarkerWithCoords(
+          station, 
+          coords, 
+          stationsWithPrices, 
+          i, 
+          markerBounds
+        );
+        
+        if (marker) {
+          // 마커 배열에 추가
+          markers.value.push(marker);
+          
+          // 인포윈도우 배열에 추가
+          if (infoWindow) {
+            infoWindows.value.push(infoWindow);
+          }
+        }
+      } catch (markerError) {
+        console.error(`주유소 ${station.osnm || '알 수 없음'} 마커 생성 중 오류:`, markerError);
+        // 개별 마커 생성 오류는 무시하고 계속 진행
+        continue;
+      }
     }
+
+    // 모든 마커가 보이도록 지도 범위 조정
+    if (!markerBounds.isEmpty() && map.value) {
+      try {
+        map.value.setBounds(markerBounds);
+      } catch (boundsError) {
+        console.error('지도 범위 설정 중 오류:', boundsError);
+        // 지도 범위 설정 실패 시 기본 중심으로 이동
+        map.value.setCenter(new window.kakao.maps.LatLng(currentCenter.value.lat, currentCenter.value.lng));
+      }
+    }
+
+    return stationsWithPrices;
+  } catch (error) {
+    console.error('주유소 마커 생성 중 오류 발생:', error);
+    // 오류 발생 시 빈 배열 반환
+    return [];
   }
-  
-  // 주소 기반 좌표 변환 작업이 있으면 완료 후 처리
-  if (markerPromises.length > 0) {
-    Promise.all(markerPromises).then(results => {
-      console.log(`주소 기반 마커 ${results.filter(Boolean).length}개 생성 완료`);
-    });
-  }
-  
-  return markers.value.length;
 };
 
 // 좌표를 이용한 마커 생성 함수 (createStationMarkers에서 사용)
-const createMarkerWithCoords = async (station, coords, stations, index, bounds) => {
-  // 마커 위치 생성
-  const position = new window.kakao.maps.LatLng(coords.lat, coords.lng);
-  
-  // 마커 이미지 생성
-  const markerImage = createMarkerImage(station, stations, index);
-  
-  // 마커 생성
-  const marker = new window.kakao.maps.Marker({
-    map: map.value,
-    position: position,
-    image: markerImage, // 커스텀 마커 이미지 사용
-    title: station.OS_NM,
-    zIndex: isLowestPrice(station.PRICE, stations) ? 5 : 1, // 최저가 주유소는 더 높은 zIndex로 설정
-    clickable: true // 클릭 가능하도록 설정
-  });
-  
-  // 가격 표시 커스텀 오버레이 생성
-  const priceContent = `
-    <div class="price-overlay ${isLowestPrice(station.PRICE, stations) ? 'lowest-price' : ''}">
-      ${formatPrice(station.PRICE)}원
-    </div>
-  `;
-  
-  const priceOverlay = new window.kakao.maps.CustomOverlay({
-    position: position,
-    content: priceContent,
-    yAnchor: 3,
-    zIndex: 3
-  });
-  
-  // 커스텀 오버레이를 지도에 표시
-  priceOverlay.setMap(map.value);
-  
-  // 거리 계산 (사용자 위치가 있는 경우)
-  let distanceText = '';
-  if (userLocation.value) {
-    const distanceInKm = calculateHaversineDistance(
-      userLocation.value.latitude,
-      userLocation.value.longitude,
-      coords.lat,
-      coords.lng
-    );
-    
-    // 거리 포맷팅 (km 단위)
-    distanceText = formatDistance(distanceInKm * 1000);
+const createMarkerWithCoords = (station, coords, stationsWithPrices, index, bounds) => {
+  if (!coords || !coords.lat || !coords.lng) {
+    return { marker: null, infoWindow: null };
   }
   
-  // 기본 인포윈도우 내용 생성 (동기적으로 처리)
-  const infoContent = await createInfoWindowContent(station, stations);
-  
-  // 인포윈도우 생성
-  const infoWindow = new window.kakao.maps.InfoWindow({
-    content: infoContent,
-    removable: true,
-    zIndex: 10
-  });
-  
-  // 마커 클릭 이벤트 리스너 등록
-  window.kakao.maps.event.addListener(marker, 'click', async function() {
-    // 기존 열린 인포윈도우 닫기
-    closeAllInfoWindows();
+  try {
+    const position = new window.kakao.maps.LatLng(coords.lat, coords.lng);
     
-    // 기존 활성화 마커가 있으면 기본 이미지로 변경
-    if (activeMarker.value && activeMarker.value !== marker) {
-      activeMarker.value.setImage(defaultMarkerImage.value);
+    // 마커 이미지 생성
+    const markerImage = createMarkerImage(station, stationsWithPrices, index);
+    
+    // 마커 생성
+    const marker = new window.kakao.maps.Marker({
+      position: position,
+      image: markerImage,
+      title: station.osnm || station.OS_NM || '주유소',
+      zIndex: 1
+    });
+    
+    // 마커를 지도에 표시
+    if (map.value) {
+      marker.setMap(map.value);
+    } else {
+      console.error('지도 객체가 없어 마커를 표시할 수 없습니다.');
+      return { marker: null, infoWindow: null };
     }
     
-    // 현재 마커를 선택된 이미지로 변경
-    marker.setImage(selectedMarkerImage.value);
+    // 인포윈도우 내용 생성
+    const infoContent = createBasicInfoWindowContent(station, stationsWithPrices);
     
-    // 현재 마커를 활성 마커로 설정
-    activeMarker.value = marker;
+    // 인포윈도우 생성
+    const infoWindow = new window.kakao.maps.InfoWindow({
+      content: infoContent,
+      removable: true
+    });
     
-    // 기본 정보로 인포윈도우 열기
-    infoWindow.setContent(await createInfoWindowContent(station, stations));
-    infoWindow.open(map.value, marker);
+    // 마커 클릭 이벤트 처리
+    window.kakao.maps.event.addListener(marker, 'click', function() {
+      try {
+        // 다른 인포윈도우 모두 닫기
+        closeAllInfoWindows();
+        
+        // 현재 마커에 인포윈도우 열기
+        infoWindow.open(map.value, marker);
+        
+        // 인포윈도우 배열에 추가
+        infoWindows.value.push(infoWindow);
+        
+        // 활성 인포윈도우 업데이트
+        activeInfoWindow.value = infoWindow;
+        
+        // 현재 마커를 활성 마커로 설정
+        activeMarker.value = marker;
+        
+        // 선택된 주유소 ID 업데이트 (emit)
+        if (station.id) {
+          emit('select-station', station.id);
+        }
+      } catch (clickError) {
+        console.error('마커 클릭 이벤트 처리 중 오류:', clickError);
+      }
+    });
     
-    // 인포윈도우 배열에 추가
-    infoWindows.value.push(infoWindow);
+    // 마커 ID 매핑 (선택된 주유소 찾기 위함)
+    if (station.id) {
+      markerMap.value[station.id] = marker;
+    }
     
-    // 활성 인포윈도우 저장
-    activeInfoWindow.value = infoWindow;
+    // 경계에 좌표 추가
+    if (bounds) {
+      bounds.extend(position);
+    }
     
-    // 선택한 주유소 ID 이벤트 발생
-    emit('select-station', station.UNI_ID);
+    // 가격 오버레이 생성 (휘발유 가격 우선, 없으면 경유, 없으면 LPG)
+    if (station.fuelPrices) {
+      try {
+        let price = null;
+        let fuelType = '';
+        let isLowestPrice = false;
+        
+        if (selectedFuelType.value === 'gasoline' && station.fuelPrices.gasoline && station.fuelPrices.gasoline > 0) {
+          price = station.fuelPrices.gasoline;
+          fuelType = 'gasoline';
+          isLowestPrice = checkIfLowestPrice(station, stationsWithPrices);
+        } else if (selectedFuelType.value === 'premium_gasoline' && station.fuelPrices.premium_gasoline && station.fuelPrices.premium_gasoline > 0) {
+          price = station.fuelPrices.premium_gasoline;
+          fuelType = 'premium_gasoline';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, stationsWithPrices, 'premium_gasoline');
+        } else if (selectedFuelType.value === 'diesel' && station.fuelPrices.diesel && station.fuelPrices.diesel > 0) {
+          price = station.fuelPrices.diesel;
+          fuelType = 'diesel';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, stationsWithPrices, 'diesel');
+        } else if (selectedFuelType.value === 'lpg' && station.fuelPrices.lpg && station.fuelPrices.lpg > 0) {
+          price = station.fuelPrices.lpg;
+          fuelType = 'lpg';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, stationsWithPrices, 'lpg');
+        } 
+        
+        if (price) {
+          // 연료 유형 한글 변환
+          const fuelTypeKorean = getFuelTypeKorean(fuelType);
+          
+          // 가격 오버레이 콘텐츠
+          const priceContent = document.createElement('div');
+          priceContent.className = `price-overlay ${fuelType.toLowerCase()} ${isLowestPrice ? 'lowest-price' : ''}`;
+          priceContent.innerHTML = `
+            <span class="fuel-type-indicator">${fuelTypeKorean}</span>
+            <span class="price-value">${price}원</span>
+            ${isLowestPrice ? '<span class="lowest-badge">최저</span>' : ''}
+          `;
+          
+          // 가격 오버레이 생성
+          const priceOverlay = new window.kakao.maps.CustomOverlay({
+            position: position,
+            content: priceContent,
+            yAnchor: 0,
+            zIndex: 2
+          });
+          
+          // 가격 오버레이 표시
+          priceOverlay.setMap(map.value);
+          
+          // 마커 제거 시 오버레이도 함께 제거하기 위해 마커에 오버레이 참조 저장
+          marker.priceOverlay = priceOverlay;
+        }
+      } catch (overlayError) {
+        console.error('가격 오버레이 생성 중 오류:', overlayError);
+      }
+    }
     
-    // 별도 함수로 상세 정보 로딩 처리
-    loadStationDetail(station.UNI_ID, infoWindow, station, stations);
-  });
-  
-  // 마커 배열에 추가
-  markers.value.push(marker);
-  
-  // 마커맵에 저장
-  markerMap.value[station.UNI_ID] = { marker, infoWindow, priceOverlay, coords, station };
-  
-  // 경계 확장
-  bounds.extend(position);
-  
-  return { marker, infoWindow };
+    return { marker, infoWindow };
+  } catch (error) {
+    console.error('마커 생성 중 오류 발생:', error);
+    return { marker: null, infoWindow: null };
+  }
 };
 
+// 특정 연료 유형의 최저가 확인 함수
+const checkIfLowestPriceForFuelType = (station, stations, fuelType) => {
+  if (!station.fuelPrices || !stations || !stations.length) return false;
+  
+  // 해당 연료 유형의 가격이 있는 주유소만 필터링
+  const stationsWithFuel = stations.filter(s => {
+    if (!s.fuelPrices) return false;
+    
+    switch(fuelType) {
+      case 'gasoline': return s.fuelPrices.gasoline && s.fuelPrices.gasoline > 0;
+      case 'diesel': return s.fuelPrices.diesel && s.fuelPrices.diesel > 0;
+      case 'lpg': return s.fuelPrices.lpg && s.fuelPrices.lpg > 0;
+      case 'premium_gasoline': return s.fuelPrices.premium_gasoline && s.fuelPrices.premium_gasoline > 0;
+      default: return false;
+    }
+  });
+  
+  if (!stationsWithFuel.length) return false;
+  
+  // 해당 연료 유형의 최저가 찾기
+  const lowestPrice = Math.min(...stationsWithFuel.map(s => {
+    switch(fuelType) {
+      case 'gasoline': return s.fuelPrices.gasoline;
+      case 'diesel': return s.fuelPrices.diesel;
+      case 'lpg': return s.fuelPrices.lpg;
+      case 'premium_gasoline': return s.fuelPrices.premium_gasoline;
+      default: return Infinity;
+    }
+  }));
+  
+  // 현재 주유소의 해당 연료 유형 가격
+  const stationPrice = (() => {
+    switch(fuelType) {
+      case 'gasoline': return station.fuelPrices.gasoline;
+      case 'diesel': return station.fuelPrices.diesel;
+      case 'lpg': return station.fuelPrices.lpg;
+      case 'premium_gasoline': return station.fuelPrices.premium_gasoline;
+      default: return null;
+    }
+  })();
+  
+  // 현재 주유소가 해당 연료 유형의 최저가인지 확인
+  return stationPrice === lowestPrice;
+};
 
+const createBasicInfoWindowContent = (station, stations) => {
+  // 연료 가격 포맷팅 함수
+  const formatFuelPrice = (price) => {
+    if (!price || price === 0) return '정보 없음';
+    return price.toString() + '원';
+  };
+
+  // 최저가 여부 확인 함수
+  const isLowestPrice = (price, fuelType, stations) => {
+    if (!price || price === 0 || !stations || !stations.length) return false;
+    
+    // 해당 연료 유형의 가격이 있는 주유소만 필터링
+    const stationsWithPrice = stations.filter(s => {
+      if (!s.fuelPrices) return false;
+      
+      switch(fuelType) {
+        case 'gasoline': return s.fuelPrices.gasoline && s.fuelPrices.gasoline > 0;
+        case 'diesel': return s.fuelPrices.diesel && s.fuelPrices.diesel > 0;
+        case 'lpg': return s.fuelPrices.lpg && s.fuelPrices.lpg > 0;
+        case 'premium_gasoline': return s.fuelPrices.premium_gasoline && s.fuelPrices.premium_gasoline > 0;
+        default: return false;
+      }
+    });
+    
+    if (!stationsWithPrice.length) return false;
+    
+    // 해당 연료 유형의 최저가 찾기
+    const lowestPrice = Math.min(...stationsWithPrice.map(s => {
+      switch(fuelType) {
+        case 'gasoline': return s.fuelPrices.gasoline;
+        case 'diesel': return s.fuelPrices.diesel;
+        case 'lpg': return s.fuelPrices.lpg;
+        case 'premium_gasoline': return s.fuelPrices.premium_gasoline;
+        default: return Infinity;
+      }
+    }));
+    
+    return price === lowestPrice;
+  };
+
+  // 인포윈도우 내용 생성
+  return `
+    <div class="info-window">
+      <div class="info-window-title">${station.osnm || station.OS_NM || '주유소'}</div>
+      <div class="info-window-content">
+        <div class="info-row">
+          <span class="info-label">주소:</span>
+          <span class="info-value">${station.adr || station.NEW_ADR || station.VAN_ADR || '정보 없음'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">전화:</span>
+          <span class="info-value">${station.tel || station.TEL || '정보 없음'}</span>
+        </div>
+        <div class="info-row">
+          <span class="info-label">브랜드:</span>
+          <span class="info-value">${station.poll || station.POLL_DIV_CD || '정보 없음'}</span>
+        </div>
+        ${station.distance ? `
+        <div class="info-row">
+          <span class="info-label">거리:</span>
+          <span class="info-value">${station.distance}m</span>
+        </div>` : ''}
+        ${station.lpgyn === 'Y' || station.LPG_YN === 'Y' ? `
+        <div class="info-row">
+          <span class="info-label">LPG:</span>
+          <span class="info-value">가능</span>
+        </div>` : ''}
+        ${station.fuelPrices ? `
+        <div class="fuel-prices">
+          ${station.fuelPrices.gasoline ? `
+          <div class="info-row">
+            <span class="info-label">휘발유:</span>
+            <span class="info-value ${isLowestPrice(station.fuelPrices.gasoline, 'gasoline', stations) ? 'lowest-price' : ''}">
+              ${formatFuelPrice(station.fuelPrices.gasoline)}
+              ${isLowestPrice(station.fuelPrices.gasoline, 'gasoline', stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+            </span>
+          </div>` : ''}
+          ${station.fuelPrices.premium_gasoline ? `
+          <div class="info-row">
+            <span class="info-label">고급유:</span>
+            <span class="info-value ${isLowestPrice(station.fuelPrices.premium_gasoline, 'premium_gasoline', stations) ? 'lowest-price' : ''}">
+              ${formatFuelPrice(station.fuelPrices.premium_gasoline)}
+              ${isLowestPrice(station.fuelPrices.premium_gasoline, 'premium_gasoline', stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+            </span>
+          </div>` : ''}
+          ${station.fuelPrices.diesel ? `
+          <div class="info-row">
+            <span class="info-label">경유:</span>
+            <span class="info-value ${isLowestPrice(station.fuelPrices.diesel, 'diesel', stations) ? 'lowest-price' : ''}">
+              ${formatFuelPrice(station.fuelPrices.diesel)}
+              ${isLowestPrice(station.fuelPrices.diesel, 'diesel', stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+            </span>
+          </div>` : ''}
+          ${station.fuelPrices.lpg ? `
+          <div class="info-row">
+            <span class="info-label">LPG:</span>
+            <span class="info-value ${isLowestPrice(station.fuelPrices.lpg, 'lpg', stations) ? 'lowest-price' : ''}">
+              ${formatFuelPrice(station.fuelPrices.lpg)}
+              ${isLowestPrice(station.fuelPrices.lpg, 'lpg', stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+            </span>
+          </div>` : ''}
+        </div>` : ''}
+      </div>
+    </div>
+  `;
+};
 
 // 선 긋기 주유소 마커 생성 함수
-const createStationMarker = (station) => {
-  const coords = station.GIS_X_COOR && station.GIS_Y_COOR
-    ? convertKatecToWGS84(parseFloat(station.GIS_X_COOR), parseFloat(station.GIS_Y_COOR))
-    : { lat: parseFloat(station.LAT), lng: parseFloat(station.LNG) };
+const fnCreateDivisionStationMarker = (station) => {
+  // 새로운 API 응답 형식에 맞게 좌표 변환
+  const coords = station.gisxcoor && station.gisycoor
+    ? convertKatecToWGS84(parseFloat(station.gisxcoor), parseFloat(station.gisycoor))
+    : null;
 
-  if (!coords || !coords.lat || !coords.lng) return null;
+  if (!coords) return null;
 
+  // 마커 위치 설정
   const position = new window.kakao.maps.LatLng(coords.lat, coords.lng);
+
+  // 마커 생성
   const marker = new window.kakao.maps.Marker({
     position: position,
-    map: map.value,
-    title: station.OS_NM,
-    image: createStationMarkerImage()
+    image: defaultMarkerImage.value,
+    clickable: true
   });
 
-  // 인포윈도우 내용 생성 (동기적으로 처리)
-  const infoContent = createBasicInfoWindowContent(station, props.fuelStations);
+  // 마커를 지도에 표시
+  marker.setMap(map.value);
+
+  // 가격 오버레이 생성 (선택된 유류 종류에 따라)
+  if (station.fuelPrices) {
+    let price = 0;
+    let fuelType = '';
+    let isLowestPrice = false;
+
+    switch (selectedFuelType.value) {
+      case 'gasoline':
+        if (station.fuelPrices.gasoline && station.fuelPrices.gasoline > 0) {
+          price = station.fuelPrices.gasoline;
+          fuelType = 'gasoline';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, [station], 'gasoline');
+        }
+        break;
+      case 'premium_gasoline':
+        if (station.fuelPrices.premium_gasoline && station.fuelPrices.premium_gasoline > 0) {
+          price = station.fuelPrices.premium_gasoline;
+          fuelType = 'premium_gasoline';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, [station], 'premium_gasoline');
+        }
+        break;
+      case 'diesel':
+        if (station.fuelPrices.diesel && station.fuelPrices.diesel > 0) {
+          price = station.fuelPrices.diesel;
+          fuelType = 'diesel';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, [station], 'diesel');
+        }
+        break;
+      case 'lpg':
+        if (station.fuelPrices.lpg && station.fuelPrices.lpg > 0) {
+          price = station.fuelPrices.lpg;
+          fuelType = 'lpg';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, [station], 'lpg');
+        }
+        break;
+      default:
+        // 기본값으로 휘발유 가격 표시
+        if (station.fuelPrices.gasoline && station.fuelPrices.gasoline > 0) {
+          price = station.fuelPrices.gasoline;
+          fuelType = 'gasoline';
+          isLowestPrice = checkIfLowestPriceForFuelType(station, [station], 'gasoline');
+        }
+        break;
+    }
+    
+    if (price > 0) {
+      // 연료 유형 한글 변환
+      const fuelTypeKorean = getFuelTypeKorean(fuelType);
+      
+      // 가격 오버레이 콘텐츠 생성
+      const priceContent = document.createElement('div');
+      priceContent.className = `price-overlay ${fuelType.toLowerCase()} ${isLowestPrice ? 'lowest-price' : ''}`;
+      priceContent.innerHTML = `
+        <span class="fuel-type-indicator">${fuelTypeKorean}</span>
+        <span class="price-value">${price}원</span>
+        ${isLowestPrice ? '<span class="lowest-badge">최저</span>' : ''}
+      `;
+      
+      // 가격 오버레이 생성
+      const priceOverlay = new window.kakao.maps.CustomOverlay({
+        position: position,
+        content: priceContent,
+        yAnchor: 0,
+        zIndex: 2
+      });
+      
+      // 가격 오버레이 표시
+      priceOverlay.setMap(map.value);
+      
+      // 마커 제거 시 오버레이도 함께 제거하기 위해 마커에 오버레이 참조 저장
+      marker.priceOverlay = priceOverlay;
+    }
+  }
 
   // 인포윈도우 생성
   const infoWindow = new window.kakao.maps.InfoWindow({
-    content: infoContent,
+    content: createBasicInfoWindowContent(station, [station]),
     removable: true
   });
 
-  // 클릭 이벤트 추가
-  window.kakao.maps.event.addListener(marker, 'click', async () => {
+  // 마커 클릭 이벤트 리스너 등록
+  window.kakao.maps.event.addListener(marker, 'click', () => {
     // 모든 인포윈도우 닫기
     closeAllInfoWindows();
-    
-    // 현재 클릭한 마커의 인포윈도우 열기
+
+    // 현재 인포윈도우 열기
     infoWindow.open(map.value, marker);
-    
-    // 인포윈도우 배열에 추가
-    infoWindows.value.push(infoWindow);
-    
-    // 활성 인포윈도우 업데이트
     activeInfoWindow.value = infoWindow;
-    
-    // 현재 마커를 활성 마커로 설정
-    activeMarker.value = marker;
-    
-    // 상세 정보 로딩
-    if (station.UNI_ID) {
-      loadStationDetail(station.UNI_ID, infoWindow, station, props.fuelStations);
-    }
+
+    // 선택된 마커 스타일 변경
+    resetMarkerImages();
+    marker.setImage(selectedMarkerImage.value);
+    selectedMarker.value = marker;
+
+    // 선택된 주유소 ID 저장
+    selectedStationId.value = station.id;
+
+    // 이벤트 발생
+    emit('select-station', station.id);
   });
 
-  // markerMap에 마커 정보 저장
-  markerMap.value[station.UNI_ID] = { marker, infoWindow, coords, station };
-
-  return { marker, infoWindow };
+  // 마커 정보 반환
+  return marker;
 };
 
 // 주유소 마커 제거 함수
 const clearStationMarkers = () => {
-  stationMarkers.value.forEach(markerInfo => {
-    if (markerInfo.marker) {
-      markerInfo.marker.setMap(null);
+  stationMarkers.value.forEach(marker => {
+    // 마커에 연결된 가격 오버레이가 있으면 제거
+    if (marker.priceOverlay) {
+      marker.priceOverlay.setMap(null);
     }
-    if (markerInfo.infoWindow) {
-      markerInfo.infoWindow.close();
+    // 마커 제거
+    marker.setMap(null);
+    // 인포윈도우가 있으면 닫기
+    if (marker.infoWindow) {
+      marker.infoWindow.close();
     }
   });
   stationMarkers.value = [];
@@ -476,33 +815,11 @@ const clearStationMarkers = () => {
 
 // 모든 주유소 인포윈도우 닫기 함수
 const closeAllStationInfoWindows = () => {
-  stationMarkers.value.forEach(markerInfo => {
-    if (markerInfo.infoWindow) {
-      markerInfo.infoWindow.close();
+  stationMarkers.value.forEach(marker => {
+    if (marker.infoWindow) {
+      marker.infoWindow.close();
     }
   });
-};
-
-// 최저가 주유소 표시 함수
-const showLowestPriceStations = async (lowestPriceStations) => {
-  // 기존 마커 제거
-  clearMarkers();
-  
-  if (!lowestPriceStations || lowestPriceStations.length === 0) {
-    console.warn('표시할 최저가 주유소가 없습니다.');
-    return;
-  }
-  
-  // 모든 주유소에 대해 마커 생성
-  const bounds = new window.kakao.maps.LatLngBounds();
-  
-  // 주유소 마커 생성 함수 호출
-  await createStationMarkers(lowestPriceStations, bounds);
-  
-  // 모든 마커가 보이도록 지도 범위 조정
-  if (markers.value.length > 0) {
-    map.value.setBounds(bounds);
-  }
 };
 
 // 모든 인포윈도우 닫기 함수
@@ -513,13 +830,13 @@ const closeAllInfoWindows = () => {
       infoWindow.close();
     }
   });
-  
+
   // 인포윈도우 배열 초기화
   infoWindows.value = [];
-  
+
   // 활성 인포윈도우 초기화
   activeInfoWindow.value = null;
-  
+
   // 활성화된 마커가 있으면 기본 이미지로 변경
   if (activeMarker.value) {
     activeMarker.value.setImage(defaultMarkerImage.value);
@@ -532,12 +849,12 @@ const showUserLocation = async () => {
   try {
     // 브라우저 위치 정보 가져오기
     const position = await getCurrentLocation();
-    
+
     const { latitude, longitude } = position;
-    
+
     // 사용자 위치 정보 저장
     userLocation.value = { latitude, longitude };
-    
+
     // 사용자 위치 마커 이미지 생성 (파란색 마커로 변경)
     const markerImage = new window.kakao.maps.MarkerImage(
       // 현재 위치를 나타내는 파란색 마커 이미지 사용
@@ -551,7 +868,7 @@ const showUserLocation = async () => {
       new window.kakao.maps.Size(35, 45),
       { offset: new window.kakao.maps.Point(18, 48) }
     );
-    
+
     // 사용자 위치 마커 생성
     const userMarker = new window.kakao.maps.Marker({
       map: map.value,
@@ -560,7 +877,7 @@ const showUserLocation = async () => {
       zIndex: 10, // 다른 마커보다 위에 표시 (더 높은 값으로 설정)
       title: '내 위치'
     });
-    
+
     // 사용자 위치 인포윈도우 생성
     const infoContent = `
       <div class="map-info-window user-location">
@@ -568,22 +885,21 @@ const showUserLocation = async () => {
         <p><strong>좌표:</strong> ${latitude.toFixed(6)}, ${longitude.toFixed(6)}</p>
       </div>
     `;
-    
+
     // 마커에 마우스 올렸을 때 이벤트
     window.kakao.maps.event.addListener(userMarker, 'mouseover', function() {
       // 다른 인포윈도우 모두 닫기
       closeAllInfoWindows();
-      
+
       // 현재 마커에 인포윈도우 열기
       const infoWindow = new window.kakao.maps.InfoWindow({
         content: infoContent,
         removable: false
       });
-      
       infoWindow.open(map.value, userMarker);
       userMarker.infoWindow = infoWindow;
     });
-    
+
     // 마커에서 마우스가 벗어났을 때 이벤트
     window.kakao.maps.event.addListener(userMarker, 'mouseout', function() {
       if (userMarker.infoWindow) {
@@ -591,25 +907,24 @@ const showUserLocation = async () => {
         userMarker.infoWindow = null;
       }
     });
-    
+
     // 마커 클릭 이벤트 처리
     window.kakao.maps.event.addListener(userMarker, 'click', function() {
       // 다른 인포윈도우 모두 닫기
       closeAllInfoWindows();
-      
+
       // 인포윈도우 생성 및 표시
       const infoWindow = new window.kakao.maps.InfoWindow({
         content: infoContent,
         removable: false
       });
-      
       infoWindow.open(map.value, userMarker);
       userMarker.infoWindow = infoWindow;
     });
-    
+
     // 사용자 위치 마커 배열에 추가
     markers.value.push(userMarker);
-    
+
     return position;
   } catch (error) {
     console.error('사용자 위치를 가져오는 중 오류 발생:', error);
@@ -624,7 +939,7 @@ const moveToStation = (station) => {
     ? convertKatecToWGS84(parseFloat(station.GIS_X_COOR), parseFloat(station.GIS_Y_COOR))
     : { lat: parseFloat(station.LAT), lng: parseFloat(station.LNG) };
 
-  if (!coords || !coords.lat || !coords.lng) return;
+  if (!coords) return;
 
   // 지도 이동
   const moveLatLng = new window.kakao.maps.LatLng(coords.lat, coords.lng);
@@ -648,11 +963,11 @@ const moveToStation = (station) => {
   if (markerInfo) {
     // 선택된 마커 색상 변경
     markerInfo.marker.setImage(createSelectedStationMarkerImage());
-    
+
     // 모든 인포윈도우 닫기
     closeAllInfoWindows();
     closeAllStationInfoWindows();
-    
+
     // 선택한 주유소의 인포윈도우 열기
     if (markerInfo.infoWindow) {
       markerInfo.infoWindow.open(map.value, markerInfo.marker);
@@ -681,13 +996,13 @@ const getAreaCenter = (areaCode) => {
     '18': { lat: 35.5384, lng: 129.3114 }, // 울산
     '19': { lat: 36.4800, lng: 127.2890 }  // 세종
   };
-  
+
   return areaCenters[areaCode] || defaultCenter.value;
 };
 
 // 가격 포맷팅 함수
 const formatPrice = (price) => {
-  return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  // return price.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 };
 
 // 주유소 상세 정보 가져오기
@@ -697,15 +1012,15 @@ const fetchStationDetail = async (stationId) => {
     if (stationDetails.value.has(stationId)) {
       return stationDetails.value.get(stationId);
     }
-    
+
     // API에서 상세 정보 가져오기
     const detailData = await fetchFuelStationDetail(stationId);
-    
+
     // 캐시에 저장
     if (detailData) {
       stationDetails.value.set(stationId, detailData);
     }
-    
+
     return detailData;
   } catch (error) {
     console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
@@ -713,132 +1028,55 @@ const fetchStationDetail = async (stationId) => {
   }
 };
 
-// 기본 인포윈도우 내용 생성 함수 (비동기 없이 빠르게 처리)
-const createBasicInfoWindowContent = (station, allStations) => {
-  const lowestPrice = allStations ? Math.min(...allStations.map(s => parseFloat(s.PRICE))) : null;
-  const isLowestPrice = lowestPrice && parseFloat(station.PRICE) === lowestPrice;
-
-  return `
-    <div class="info-window">
-      <div class="info-window-title">${station.OS_NM}</div>
-      <div class="info-window-content">
-        <div class="info-row">
-          <span class="info-label">가격:</span>
-          <span class="info-value ${isLowestPrice ? 'lowest-price' : ''}">${station.PRICE}원</span>
-          ${isLowestPrice ? '<span class="lowest-price-badge">최저가</span>' : ''}
-        </div>
-        <div class="info-row">
-          <span class="info-label">거리:</span>
-          <span class="info-value">${(station.DISTANCE / 1000).toFixed(2)}km</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">주소:</span>
-          <span class="info-value">로딩 중...</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">전화:</span>
-          <span class="info-value">로딩 중...</span>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
-// 인포윈도우 내용 생성 함수
-const createInfoWindowContent = async (station, allStations, detailData = null) => {
-  if (detailData === undefined) {
-    return '<div class="info-window loading">상세 정보 로딩 중...</div>';
-  }
-
-  // 주소 정보가 없고 주유소 ID가 있는 경우 상세 정보 가져오기
-  let stationDetail = detailData;
-  if (!station.NEW_ADR && !station.ADR && station.UNI_ID && !detailData) {
-    try {
-      stationDetail = await fetchFuelStationDetail(station.UNI_ID);
-    } catch (error) {
-      console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
-    }
-  }
-
-  // 상세 정보에서 주소 가져오기
-  const address = stationDetail.OIL[0].NEW_ADR || '주소 정보 없음';
-  
-  // 전화번호 정보 가져오기
-  const tel = stationDetail.OIL[0].TEL || '정보 없음';
-
-  const lowestPrice = allStations ? Math.min(...allStations.map(s => parseFloat(s.PRICE))) : null;
-  const isLowestPrice = lowestPrice && parseFloat(station.PRICE) === lowestPrice;
-
-  return `
-    <div class="info-window">
-      <div class="info-window-title">${station.OS_NM}</div>
-      <div class="info-window-content">
-        <div class="info-row">
-          <span class="info-label">가격:</span>
-          <span class="info-value ${isLowestPrice ? 'lowest-price' : ''}">${station.PRICE}원</span>
-          ${isLowestPrice ? '<span class="lowest-price-badge">최저가</span>' : ''}
-        </div>
-        <div class="info-row">
-          <span class="info-label">거리:</span>
-          <span class="info-value">${(station.DISTANCE / 1000).toFixed(2)}km</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">주소:</span>
-          <span class="info-value">${address}</span>
-        </div>
-        <div class="info-row">
-          <span class="info-label">전화:</span>
-          <span class="info-value">${tel}</span>
-        </div>
-      </div>
-    </div>
-  `;
-};
-
 // 지도 초기화
 const initializeMap = async () => {
   try {
-    loading.value = true;
-    
     // 카카오맵 SDK 초기화
     await initKakaoMap();
-    
+
     // 지도 컨테이너 확인
-    const container = document.getElementById('list-kakao-map');
-    if (!container) {
-      console.warn('지도를 표시할 DOM 요소를 찾을 수 없습니다.');
-      loading.value = false;
+    const mapContainer = document.getElementById('list-kakao-map');
+    if (!mapContainer) {
+      console.error('지도 컨테이너를 찾을 수 없습니다.');
       return;
     }
-    
-    // 지역 코드에 따른 중심 좌표 설정
-    currentCenter.value = getAreaCenter(props.selectedArea);
-    
+
+    // 지도 중심 좌표 설정 (지역 코드에 따라)
+    const center = getAreaCenter(props.selectedArea);
+    currentCenter.value = center;
+
+    console.log('지정된 중심 좌표:', currentCenter.value);
     // 지도 옵션 설정
-    const options = {
-      center: new window.kakao.maps.LatLng(currentCenter.value.lat, currentCenter.value.lng),
-      level: 9 // 초기 줌 레벨
+    const mapOptions = {
+      center: new window.kakao.maps.LatLng(center.lat, center.lng),
+      level: 8
     };
-    
+
     // 지도 생성
-    map.value = new window.kakao.maps.Map(container, options);
-    
-    // 기본 마커 이미지 생성
-    defaultMarkerImage.value = new window.kakao.maps.MarkerImage(
-      'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png',
-      new window.kakao.maps.Size(22, 36)
-    );
-    
-    // 선택된 마커 이미지 생성 (다른 색상의 마커)
-    selectedMarkerImage.value = createSelectedStationMarkerImage();
-    
+    map.value = new window.kakao.maps.Map(mapContainer, mapOptions);
+
+    // 지도 생성 후 로딩 상태 업데이트
+    loading.value = false;
+
     // 지도 클릭 이벤트 리스너 등록
     window.kakao.maps.event.addListener(map.value, 'click', handleMapClick);
-    
-    // 마커 생성
-    await createMarkers();
-    
-    loading.value = false;
+
+    // 기본 마커 이미지 생성
+    defaultMarkerImage.value = createStationMarkerImage();
+
+    // 선택된 마커 이미지 생성
+    selectedMarkerImage.value = createSelectedStationMarkerImage();
+
+    // 마커 생성 전 지연 시간 추가 (지도 렌더링 완료 대기)
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // 사용자 위치 표시
+    showUserLocation();
+
+    // 선택된 주유소가 있는 경우 해당 주유소로 이동
+    if (props.selectedStationId) {
+      showStationInfoWindow(props.selectedStationId);
+    }
   } catch (error) {
     console.error('지도 초기화 중 오류 발생:', error);
     loading.value = false;
@@ -850,19 +1088,18 @@ const handleMapClick = (mouseEvent) => {
   if (!isDrawMode.value) {
     // 클릭 시 열려있는 인포윈도우 닫기
     closeAllInfoWindows();
-    closeAllStationInfoWindows();
-    
+
     // 활성화된 마커가 있으면 기본 이미지로 변경
     if (activeMarker.value) {
       activeMarker.value.setImage(defaultMarkerImage.value);
       activeMarker.value = null;
     }
-    
+
     // 선택된 주유소 ID 초기화
     emit('select-station', null);
   } else {
     const clickPosition = mouseEvent.latLng;
-    
+
     if (!startPoint.value) {
       // 시작점 설정
       startPoint.value = clickPosition;
@@ -879,7 +1116,7 @@ const handleMapClick = (mouseEvent) => {
         map: map.value,
         title: '끝점'
       });
-      
+
       // 선 그리기
       const path = [startPoint.value, endPoint.value];
       line.value = new window.kakao.maps.Polyline({
@@ -890,7 +1127,7 @@ const handleMapClick = (mouseEvent) => {
         strokeStyle: 'solid'
       });
       line.value.setMap(map.value);
-      
+
       // 그리기 모드 종료
       isDrawMode.value = false;
     }
@@ -908,25 +1145,165 @@ const toggleDrawMode = () => {
 // 선 분할하기
 const divideLine = async () => {
   if (!startPoint.value || !endPoint.value) return;
-  
+
   // 기존 마커들 제거
   clearDivideMarkers();
   clearStationMarkers();
-  
+
   // 선 분할 계산
   const points = divideLineIntoPoints(
     { lat: startPoint.value.getLat(), lng: startPoint.value.getLng() },
     { lat: endPoint.value.getLat(), lng: endPoint.value.getLng() }
   );
-  
+
   dividePoints.value = points;
-  
+
   // 분할 지점에서 주유소 검색만 실행
-  points.forEach((point, index) => {
-    if (index === 0 || index === points.length - 1) return;
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (i === 0 || i === points.length - 1) continue;
     // 주유소 검색 실행
-    searchStationsAroundPoint(point, index);
-  });
+    searchStationsAroundPoint(point, i);
+  }
+};
+
+// 주유소 검색 함수
+const searchStationsAroundPoint = async (point, index) => {
+  if (!point || !point.lat || !point.lng) return;
+
+  // 해당 지점의 상태 초기화
+  pointStations.value[index] = {
+    loading: true,
+    stations: [],
+    error: null
+  };
+
+  try {
+    const { gasStations, fetchGasStations } = useGasStationFinder();
+
+    // 반경 단위를 km에서 m로 변환
+    const radiusInMeters = searchRadius.value * 1000;
+
+    // 주유소 검색
+    await fetchGasStations(point.lng, point.lat, radiusInMeters);
+
+    // 검색 결과 저장
+    pointStations.value[index] = {
+      loading: false,
+      stations: gasStations.value,
+      error: null
+    };
+
+    // 주유소 가격 정보 가져오기
+    const stationIds = gasStations.value.map(station => station.id);
+    const fuelPrices = await fetchFuelPrices(stationIds);
+
+    // 주유소 ID별 연료 가격 매핑
+    const fuelPriceMap = {};
+    if (fuelPrices && fuelPrices.info && Array.isArray(fuelPrices.info)) {
+      fuelPrices.info.forEach(priceInfo => {
+        if (priceInfo.id) {
+          fuelPriceMap[priceInfo.id] = {
+            gasoline: parseInt(priceInfo.gasoline || 0),
+            premium_gasoline: parseInt(priceInfo.premium_gasoline || 0),
+            diesel: parseInt(priceInfo.diesel || 0),
+            lpg: parseInt(priceInfo.lpg || 0)
+          };
+        }
+      });
+    }
+
+    // 주유소 데이터에 연료 가격 정보 추가
+    const stationsWithPrices = gasStations.value.map(station => {
+      const stationId = station.id;
+      const fuelPrice = fuelPriceMap[stationId] || {
+        gasoline: 0,
+        premium_gasoline: 0,
+        diesel: 0,
+        lpg: 0
+      };
+
+      return {
+        ...station,
+        fuelPrices: fuelPrice
+      };
+    });
+
+    // 선택된 유류 종류에 맞는 주유소만 필터링
+    const filteredStations = stationsWithPrices.filter(station => {
+      if (!station.fuelPrices) return false;
+      
+      switch (selectedFuelType.value) {
+        case 'gasoline':
+          return station.fuelPrices.gasoline > 0;
+        case 'premium_gasoline':
+          return station.fuelPrices.premium_gasoline > 0;
+        case 'diesel':
+          return station.fuelPrices.diesel > 0;
+        case 'lpg':
+          return station.fuelPrices.lpg > 0;
+        default:
+          return true;
+      }
+    });
+
+    // 필터링된 주유소에 대해서만 마커 생성
+    filteredStations.forEach(station => {
+      const markerInfo = fnCreateDivisionStationMarker(station);
+      if (markerInfo) {
+        stationMarkers.value.push(markerInfo);
+      }
+    });
+  } catch (error) {
+    pointStations.value[index] = {
+      loading: false,
+      stations: [],
+      error: '주유소 검색 중 오류가 발생했습니다.'
+    };
+  }
+};
+
+// 주유소 상세 정보 로딩 함수
+const loadStationDetail = async (stationId, infoWindow, station, stations) => {
+  try {
+    // API에서 상세 정보 가져오기
+    const detailData = await fetchFuelStationDetail(stationId);
+
+    if (detailData && detailData.OIL && detailData.OIL[0]) {
+      // 상세 정보로 인포윈도우 내용 생성
+      const content = `
+        <div class="info-window">
+          <div class="info-window-title">${station.OS_NM}</div>
+          <div class="info-window-content">
+            <div class="info-row">
+              <span class="info-label">가격:</span>
+              <span class="info-value ${isLowestPrice(station.PRICE, stations) ? 'lowest-price' : ''}">${station.PRICE}원</span>
+              ${isLowestPrice(station.PRICE, stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
+            </div>
+            <div class="info-row">
+              <span class="info-label">거리:</span>
+              <span class="info-value">${(station.DISTANCE / 1000).toFixed(2)}km</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">주소:</span>
+              <span class="info-value">${detailData.OIL[0].NEW_ADR || detailData.OIL[0].ADR || '주소 정보 없음'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">전화:</span>
+              <span class="info-value">${detailData.OIL[0].TEL || '정보 없음'}</span>
+            </div>
+          </div>
+        </div>
+      `;
+
+      // 현재 인포윈도우가 열려있는 상태일 때만 내용 업데이트
+      if (infoWindow === activeInfoWindow.value) {
+        infoWindow.setContent(content);
+      }
+    }
+  } catch (error) {
+    console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
+  }
 };
 
 // 분할 마커 제거
@@ -959,11 +1336,11 @@ const clearLine = () => {
 // 지역 변경 시 지도 중심 변경
 watch(() => props.selectedArea, async (newArea) => {
   if (!map.value) return;
-  
+
   // 새 지역의 중심 좌표 가져오기
   const newCenter = getAreaCenter(newArea);
   currentCenter.value = newCenter;
-  
+
   // 지도 중심 이동
   map.value.setCenter(new window.kakao.maps.LatLng(newCenter.lat, newCenter.lng));
   map.value.setLevel(9); // 줌 레벨 재설정
@@ -972,7 +1349,7 @@ watch(() => props.selectedArea, async (newArea) => {
 // 주유소 목록 변경 시 마커 업데이트
 watch(() => props.fuelStations, async () => {
   if (map.value) {
-    await createMarkers();
+    await fnCreateStationMarkers();
   }
 }, { deep: true });
 
@@ -1005,17 +1382,17 @@ const showStationInfoWindow = async (stationId) => {
 
   // 인포윈도우 표시
   closeAllInfoWindows();
-  
+
   if (markerInfo.infoWindow) {
     markerInfo.infoWindow.open(map.value, markerInfo.marker);
-    
+
     // 인포윈도우 배열에 추가
     infoWindows.value.push(markerInfo.infoWindow);
-    
+
     // 활성 인포윈도우 저장
     activeInfoWindow.value = markerInfo.infoWindow;
   }
-  
+
   // 선택된 주유소 ID 업데이트
   selectedStationId.value = stationId;
 };
@@ -1026,7 +1403,7 @@ watch(() => props.selectedStationId, (newStationId) => {
   } else {
     // 선택 해제 시 모든 인포윈도우 닫기
     closeAllInfoWindows();
-    
+
     // 모든 가격 오버레이 스타일 초기화
     Object.values(markerMap.value).forEach(item => {
       if (item.priceOverlay) {
@@ -1036,89 +1413,74 @@ watch(() => props.selectedStationId, (newStationId) => {
   }
 });
 
-// 주유소 상세 정보 로딩 함수
-const loadStationDetail = async (stationId, infoWindow, station, stations) => {
+// 유류 종류 필터링 함수
+const changeFuelType = (event) => {
+  selectedFuelType.value = event.target.value;
+  console.log(`유류 종류 변경: ${selectedFuelType.value}`);
+
+  // 마커 필터링 적용
+  fnCreateStationMarkers();
+};
+
+// 연료 가격 정보 가져오기
+const fetchFuelPrices = async (stationIds) => {
+  if (!stationIds || !stationIds.length) {
+    console.warn('주유소 ID가 제공되지 않았습니다.');
+    return { info: [] }; 
+  }
+
+  // 로컬스토리지 캐시 키 생성
+  const cacheKey = 'fuelPrices_cache';
+  
   try {
-    // API에서 상세 정보 가져오기
-    const detailData = await fetchFuelStationDetail(stationId);
+    // 캐시된 데이터 확인
+    const cachedData = localStorage.getItem(cacheKey);
     
-    if (detailData && detailData.OIL && detailData.OIL[0]) {
-      // 상세 정보로 인포윈도우 내용 생성
-      const content = `
-        <div class="info-window">
-          <div class="info-window-title">${station.OS_NM}</div>
-          <div class="info-window-content">
-            <div class="info-row">
-              <span class="info-label">가격:</span>
-              <span class="info-value ${isLowestPrice(station.PRICE, stations) ? 'lowest-price' : ''}">${station.PRICE}원</span>
-              ${isLowestPrice(station.PRICE, stations) ? '<span class="lowest-price-badge">최저가</span>' : ''}
-            </div>
-            <div class="info-row">
-              <span class="info-label">거리:</span>
-              <span class="info-value">${(station.DISTANCE / 1000).toFixed(2)}km</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">주소:</span>
-              <span class="info-value">${detailData.OIL[0].NEW_ADR || detailData.OIL[0].ADR || '주소 정보 없음'}</span>
-            </div>
-            <div class="info-row">
-              <span class="info-label">전화:</span>
-              <span class="info-value">${detailData.OIL[0].TEL || '정보 없음'}</span>
-            </div>
-          </div>
-        </div>
-      `;
+    if (cachedData) {
+      const parsedCache = JSON.parse(cachedData);
+      const currentTime = new Date().getTime();
       
-      // 현재 인포윈도우가 열려있는 상태일 때만 내용 업데이트
-      if (infoWindow === activeInfoWindow.value) {
-        infoWindow.setContent(content);
+      // 캐시 만료 시간 확인 (1시간 = 3600000 밀리초)
+      if (parsedCache.timestamp && (currentTime - parsedCache.timestamp < 3600000)) {
+        console.log('캐시된 연료 가격 데이터 사용');
+        return parsedCache.data;
       }
     }
+    
+    // 캐시가 없거나 만료된 경우 API 호출
+    const apiUrl = `/api/its/api/infoGasPriceList?code=860665`;
+    const response = await axios.get(apiUrl);
+
+    // 응답 데이터 확인
+    if (!response.data || !response.data.info) {
+      console.warn('연료 가격 데이터가 없거나 형식이 올바르지 않습니다.');
+      return { info: [] }; 
+    }
+    
+    // 데이터를 캐시에 저장 (타임스탬프 포함)
+    const cacheData = {
+      timestamp: new Date().getTime(),
+      data: response.data
+    };
+    
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    console.log('새로운 연료 가격 데이터 캐싱');
+    
+    return response.data;
   } catch (error) {
-    console.error('주유소 상세 정보를 가져오는 중 오류가 발생했습니다:', error);
+    console.error('연료 가격 정보를 가져오는 중 오류 발생:', error);
+    return { info: [] };
   }
 };
 
-// 주유소 검색 함수
-const searchStationsAroundPoint = async (point, index) => {
-  if (!point || !point.lat || !point.lng) return;
-  
-  // 해당 지점의 상태 초기화
-  pointStations.value[index] = {
-    loading: true,
-    stations: [],
-    error: null
-  };
-  
-  try {
-    const { gasStations, fetchGasStations } = useGasStationFinder();
-    
-    // 반경 단위를 km에서 m로 변환
-    const radiusInMeters = searchRadius.value * 1000;
-    
-    // 주유소 검색
-    await fetchGasStations(point.lng, point.lat, radiusInMeters);
-    
-    // 검색 결과 저장
-    pointStations.value[index] = {
-      loading: false,
-      stations: gasStations.value,
-      error: null
-    };
-
-    // 주유소 마커 생성
-    gasStations.value.forEach(station => {
-      const markerInfo = createStationMarker(station);
-      if (markerInfo) {
-        stationMarkers.value.push(markerInfo);
-      }
-    });
-  } catch (error) {
-    pointStations.value[index] = {
-      loading: false,
-      stations: [],
-      error: '주유소 검색 중 오류가 발생했습니다.'
-    };
+// 연료 유형 한글 변환 함수
+const getFuelTypeKorean = (fuelType) => {
+  switch(fuelType) {
+    case 'gasoline': return '휘발유';
+    case 'diesel': return '경유';
+    case 'lpg': return 'LPG';
+    case 'premium_gasoline': return '고급유';
+    default: return '';
   }
 };
 
@@ -1131,29 +1493,28 @@ onMounted(() => {
 onUnmounted(() => {
   // 마커 제거
   markers.value.forEach(marker => marker.setMap(null));
-  
+
   // 인포윈도우 닫기
   closeAllInfoWindows();
-  
+
   // 가격 오버레이 제거
   Object.values(markerMap.value).forEach(item => {
     if (item.priceOverlay) {
       item.priceOverlay.setMap(null);
     }
   });
-  
+
   // 지도 이벤트 리스너 제거
   if (map.value) {
     window.kakao.maps.event.removeListener(map.value, 'click', handleMapClick);
   }
-  
+
   map.value = null;
 });
 
 // 외부에서 접근할 수 있는 메서드 노출
 defineExpose({
   moveToStation,
-  showLowestPriceStations,
   showStationInfoWindow
 });
 </script>
@@ -1188,81 +1549,128 @@ defineExpose({
 }
 
 /* 가격 오버레이 스타일 */
-:deep(.price-overlay) {
+.price-overlay {
   background-color: white;
-  color: #333;
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  font-weight: bold;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
   border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   white-space: nowrap;
+  text-align: center;
+  position: relative;
+  margin-top: -40px;
+  margin-left: -20px;
 }
 
-:deep(.price-overlay.lowest-price) {
-  background-color: #ffeb3b;
+/* 연료 유형별 색상 */
+.price-overlay.gasoline {
+  border-left: 3px solid #ff6b6b;
+}
+
+.price-overlay.premium_gasoline {
+  border-left: 3px solid #cc5de8;
+}
+
+.price-overlay.diesel {
+  border-left: 3px solid #339af0;
+}
+
+.price-overlay.lpg {
+  border-left: 3px solid #20c997;
+}
+
+/* 최저가 스타일 */
+.price-overlay.lowest-price {
+  background-color: #fff9db;
+  border: 1px solid #ffd43b;
+  font-weight: bold;
+}
+
+.lowest-badge {
+  background-color: #ffd43b;
+  color: #212529;
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 2px;
+  margin-left: 4px;
+}
+
+.fuel-type-indicator {
+  font-size: 10px;
+  color: #666;
+  display: block;
+  margin-bottom: 2px;
+}
+
+.price-value {
+  font-weight: 600;
   color: #333;
-  border-color: #ffc107;
 }
 
 /* 인포윈도우 스타일 */
-:deep(.info-window) {
-  padding: 15px;
-  min-width: 200px;
-  max-width: 300px;
-  font-family: 'Noto Sans KR', sans-serif;
+.info-window {
+  padding: 10px;
+  width: 250px;
 }
 
-:deep(.info-window-title) {
+.info-window-title {
   font-size: 16px;
   font-weight: bold;
-  margin-bottom: 10px;
-  color: #333;
-  border-bottom: 2px solid #4169E1;
+  margin-bottom: 8px;
+  border-bottom: 1px solid #eee;
   padding-bottom: 5px;
 }
 
-:deep(.info-window-content) {
-  font-size: 14px;
+.lowest-price-badge {
+  background-color: #ffd43b;
+  color: #212529;
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  margin-bottom: 8px;
+  display: inline-block;
 }
 
-:deep(.info-row) {
-  margin: 5px 0;
+.info-window-content {
+  font-size: 13px;
+}
+
+.info-row {
+  margin-bottom: 5px;
   display: flex;
-  align-items: flex-start;
 }
 
-:deep(.info-label) {
-  font-weight: 500;
+.info-label {
+  font-weight: 600;
+  width: 60px;
   color: #666;
-  min-width: 45px;
-  margin-right: 8px;
 }
 
-:deep(.info-value) {
-  color: #333;
+.info-value {
   flex: 1;
 }
 
-:deep(.lowest-price) {
-  color: #FF6B6B;
+.highlight-price {
   font-weight: bold;
+  color: #e03131;
 }
 
-:deep(.lowest-price-badge) {
-  background-color: #FF6B6B;
-  color: white;
-  padding: 2px 6px;
+.fuel-prices {
+  margin-top: 8px;
+  border-top: 1px dashed #eee;
+  padding-top: 8px;
+}
+
+/* 선택 버튼 스타일 */
+.fuel-type-select {
+  margin-bottom: 10px;
+  padding: 8px;
+  border: 1px solid #ddd;
   border-radius: 4px;
-  font-size: 12px;
-  margin-left: 8px;
-}
-
-:deep(.loading) {
-  text-align: center;
-  color: #666;
-  padding: 10px;
+  background-color: white;
+  font-size: 14px;
+  width: 100%;
 }
 
 .map-controls {
@@ -1305,6 +1713,27 @@ defineExpose({
 
 .radius-control input {
   width: 150px;
+}
+
+.fuel-type-filter {
+  display: flex;
+  flex-direction: column;
+  background: white;
+  padding: 8px;
+  border-radius: 4px;
+  margin-left: 8px;
+}
+
+.fuel-type-filter label {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.fuel-type-filter select {
+  width: 150px;
+  padding: 8px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
 }
 
 .divide-points {
@@ -1380,5 +1809,11 @@ defineExpose({
 .station-info-window .station-detail {
   font-size: 13px;
   color: #666;
+}
+
+.fuel-prices {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed #eee;
 }
 </style>

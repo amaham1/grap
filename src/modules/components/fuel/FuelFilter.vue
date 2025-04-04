@@ -1,24 +1,6 @@
 <template>
   <div class="fuel-filter">
     <div class="filter-group">
-      <label for="fuel-type">유류 종류:</label>
-      <select 
-        id="fuel-type" 
-        v-model="localFuelType"
-        @change="updateFuelType" 
-        class="filter-select"
-      >
-        <option 
-          v-for="fuelType in fuelTypes" 
-          :key="fuelType.value" 
-          :value="fuelType.value"
-        >
-          {{ fuelType.label }}
-        </option>
-      </select>
-    </div>
-    
-    <div class="filter-group">
       <label for="area">지역:</label>
       <select 
         id="area" 
@@ -45,7 +27,7 @@ import { FUEL_TYPES, AREA_CODES } from '@/modules/fuel/api/fuelService';
 const props = defineProps({
   selectedFuelType: {
     type: String,
-    default: 'B027' // 기본값: 휘발유
+    default: 'gasoline' // 기본값: 휘발유
   },
   selectedArea: {
     type: String,

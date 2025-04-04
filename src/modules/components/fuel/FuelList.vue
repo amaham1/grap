@@ -42,8 +42,8 @@
     <div v-else class="fuel-stations-list">
       <fuel-station-card 
         v-for="(station, index) in visibleStations" 
-        :key="station.UNI_ID" 
-        :station="station"
+        :key="station.id" 
+        :gasStations="station"
         :allStations="gasStations"
         :selected="selectedStationId === station.UNI_ID"
         :userLocation="userLocation"
@@ -108,7 +108,7 @@ import { initKakaoMap } from '@/api/kakaoMapApi';
 const fuelStations = ref([]);
 const loading = ref(false);
 const error = ref(null);
-const selectedFuelType = ref('B027'); // 기본값: 휘발유
+const selectedFuelType = ref('gasoline'); // 기본값: 휘발유
 const selectedArea = ref('11'); // 기본값: 제주
 const fuelListMapRef = ref(null);
 const selectedStationId = ref(null);
@@ -118,14 +118,28 @@ const locationLoading = ref(false);
 // 더보기 기능을 위한 상태
 const visibleCount = ref(6); // 처음에 보여줄 카드 개수
 
+// 필터링된 주유소 목록 (computed)
+const filteredStations = computed(() => {
+  if (!selectedFuelType.value || !gasStations.value.length) {
+    return gasStations.value;
+  }
+  
+  // 선택된 유류 종류의 가격이 있는 주유소만 필터링
+  return gasStations.value.filter(station => {
+    return station.fuelPrices && 
+           station.fuelPrices[selectedFuelType.value] && 
+           station.fuelPrices[selectedFuelType.value] > 0;
+  });
+});
+
 // 현재 보이는 주유소 목록 (computed)
 const visibleStations = computed(() => {
-  return gasStations.value.slice(0, visibleCount.value);
+  return filteredStations.value.slice(0, visibleCount.value);
 });
 
 // 더 보여줄 주유소가 있는지 확인 (computed)
 const hasMoreStations = computed(() => {
-  return visibleCount.value < gasStations.value.length;
+  return visibleCount.value < filteredStations.value.length;
 });
 
 // 더보기 버튼 클릭 시 실행할 함수
@@ -287,6 +301,8 @@ const showLowestPriceStations = async () => {
       selectedFuelType.value, 
       selectedArea.value
     );
+
+    console.log('최저가 주유소:', lowestPriceStations);
     
     // 최저가 주유소 데이터로 gasStations 업데이트
     gasStations.value = lowestPriceStations;
@@ -319,13 +335,13 @@ onMounted(async () => {
     console.error('카카오 맵 API 초기화 중 오류 발생:', error);
   }
   
-  fetchFuelStations();
+  // fetchFuelStations();
   fetchUserLocation();
 });
 
 // 필터 변경 시 데이터 갱신
 watch([selectedFuelType, selectedArea], () => {
-  fetchFuelStations();
+  // fetchFuelStations();
   selectedStationId.value = null; // 필터 변경 시 선택된 주유소 초기화
 });
 </script>

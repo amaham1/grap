@@ -23,6 +23,11 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/opinet/, '')
       },
+      '/api/its': {
+        target: 'http://api.jejuits.go.kr',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/its/, '')
+      },
       // 카카오 API 프록시 설정
       '/api/kakao': {
         target: 'https://dapi.kakao.com',

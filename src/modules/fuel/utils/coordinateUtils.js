@@ -101,7 +101,7 @@ export function useGasStationFinder() {
   proj4.defs('KATEC', '+proj=tmerc +lat_0=38 +lon_0=128 +k=0.9999 +x_0=400000 +y_0=600000 +ellps=bessel +units=m +no_defs +towgs84=-115.80,474.99,674.11,1.16,-2.31,-1.63,6.43');
 
   // 반경 내 주유소 정보 가져오기
-  const fetchGasStations = async (longitude, latitude, radius = 1000, prodcd = 'B027', sort = 1) => {
+  const fetchGasStations = async (longitude, latitude, radius = 1000, prodcd = 'gasoline', sort = 1) => {
     if (radius > 5000) {
       throw new Error('검색 반경은 최대 5km(5000m)를 초과할 수 없습니다.');
     }
@@ -112,35 +112,116 @@ export function useGasStationFinder() {
     try {
       const katecCoords = convertToKATEC(longitude, latitude);
       
-      const response = await axios.get(`${API_BASE_URL}/api/aroundAll.do`, {
-        params: {
-          code: apiKey.value,
-          x: katecCoords.x,
-          y: katecCoords.y,
-          radius,
-          prodcd,
-          sort,
-          out: 'json'
+      // 캐시된 데이터 확인
+      const cachedData = localStorage.getItem('gasStationsData');
+      const cachedTimestamp = localStorage.getItem('gasStationsTimestamp');
+      const TWO_DAYS_IN_MS = 2 * 24 * 60 * 60 * 1000;
+      
+      let apiData;
+      
+      // 캐시 유효성 검사
+      if (cachedData && cachedTimestamp) {
+        const now = new Date().getTime();
+        const timestamp = parseInt(cachedTimestamp);
+        
+        // 캐시가 2일 이내인 경우 캐시된 데이터 사용
+        if (now - timestamp < TWO_DAYS_IN_MS) {
+          console.log('캐시된 데이터 사용');
+          apiData = JSON.parse(cachedData);
         }
-      });
+      }
+      
+      // 캐시된 데이터가 없거나 만료된 경우 API 호출
+      if (!apiData) {
+        console.log('API 호출로 새로운 데이터 가져오기');
+        const response = await axios.get(`/api/its/api/infoGasInfoList?code=860665`);
+        
+        if (response.data && response.data.result === 'success' && response.data.info) {
+          // 데이터 캐싱
+          localStorage.setItem('gasStationsData', JSON.stringify(response.data));
+          localStorage.setItem('gasStationsTimestamp', new Date().getTime().toString());
+          apiData = response.data;
+        }
+      }
+      
+      if (apiData && apiData.info && apiData.info.length > 0) {
+        // 주유소 데이터 필터링 (1000m 이내)
+        const filteredStations = apiData.info.filter(station => {
+          // 두 좌표 사이의 거리 계산 (KATEC 좌표계 사용)
+          const stationX = parseFloat(station.gisxcoor);
+          const stationY = parseFloat(station.gisycoor);
+          
+          if (isNaN(stationX) || isNaN(stationY)) return false;
+          
+          // 유클리드 거리 계산 (단순 직선 거리)
+          const distance = Math.sqrt(
+            Math.pow(stationX - katecCoords.x, 2) + 
+            Math.pow(stationY - katecCoords.y, 2)
+          );
+          
+          // 거리 정보 추가 (미터 단위)
+          station.distance = distance;
+          
+          // 지정된 반경 내에 있는지 확인
+          return distance <= radius;
+        });
 
-      if (response.data.RESULT && response.data.RESULT.OIL) {
-        // 주유소 데이터 정렬 (가격 오름차순, 같은 가격은 거리 오름차순)
-        gasStations.value = response.data.RESULT.OIL
-          .sort((a, b) => {
-            const priceA = parseFloat(a.PRICE) || Number.MAX_VALUE;
-            const priceB = parseFloat(b.PRICE) || Number.MAX_VALUE;
-            
-            if (priceA !== priceB) {
-              return priceA - priceB;
-            }
-            
-            return parseFloat(a.DISTANCE) - parseFloat(b.DISTANCE);
-          })
-          .map(station => ({
+        // 연료 가격 정보 가져오기
+        const fuelPrices = await fetchFuelPrices(filteredStations.map(station => station.id));
+        // 주유소 ID별 연료 가격 매핑
+        const fuelPriceMap = {};
+        if (fuelPrices && fuelPrices.info && Array.isArray(fuelPrices.info)) {
+          fuelPrices.info.forEach(item => {
+            if (!item || !item.id) return;
+        
+            const id = item.id;
+            // 연료 가격 정보 구조화
+            fuelPriceMap[id] = {  
+              gasoline: parseFloat(item.gasoline) || 0,          // 휘발유
+              premium_gasoline: parseFloat(item.premium_gasoline) || 0, // 고급유
+              diesel: parseFloat(item.diesel) || 0,          // 경유
+              lpg: parseFloat(item.lpg) || 0            // LPG
+            };
+          });
+        }
+    
+        // 주유소 데이터에 연료 가격 정보 추가
+        const stationsWithPrices = filteredStations.map(station => {
+          const stationId = station.id;
+          if (stationId && fuelPriceMap[stationId]) {
+            return {
+              ...station,
+              fuelPrices: fuelPriceMap[stationId]
+            };
+          }
+          // 가격 정보가 없는 경우 빈 객체 추가
+          return {
             ...station,
-            PRICE: station.PRICE ? parseInt(station.PRICE).toLocaleString() : '정보없음',
-            DISTANCE: parseFloat(station.DISTANCE)
+            fuelPrices: {
+              gasoline: 0,
+              premium_gasoline: 0,
+              diesel: 0,
+              lpg: 0
+            }
+          };
+        });
+        
+        // 거리 기준으로 정렬
+        gasStations.value = stationsWithPrices
+          .sort((a, b) => a.distance - b.distance)
+          .map(station => ({
+            id: station.id,
+            poll: station.poll,
+            gpoll: station.gpoll,
+            osnm: station.osnm,
+            zip: station.zip,
+            adr: station.adr,
+            tel: station.tel,
+            lpgyn: station.lpgyn,
+            gisxcoor: station.gisxcoor,
+            gisycoor: station.gisycoor,
+            distance: Math.round(station.distance), // 미터 단위로 반올림
+            fuelPrices: station.fuelPrices
           }));
       } else {
         throw new Error('주유소 데이터를 찾을 수 없습니다.');
@@ -158,6 +239,8 @@ export function useGasStationFinder() {
     };
   };
 
+  
+
   return {
     gasStations,
     isLoading,
@@ -165,3 +248,51 @@ export function useGasStationFinder() {
     fetchGasStations
   };
 }
+
+// 연료 가격 정보 가져오기
+export const fetchFuelPrices = async () => {
+  // 로컬스토리지 캐시 키 생성
+  const cacheKey = 'fuelPrices_cache';
+  
+  try {
+    // 캐시된 데이터 확인
+    const cachedData = localStorage.getItem(cacheKey);
+    
+    if (cachedData) {
+      const parsedCache = JSON.parse(cachedData);
+      const currentTime = new Date().getTime();
+      
+      // 캐시 만료 시간 확인 (1시간 = 3600000 밀리초)
+      if (parsedCache.timestamp && (currentTime - parsedCache.timestamp < 3600000)) {
+        console.log('캐시된 연료 가격 데이터 사용');
+        console.log(parsedCache.data)
+        return parsedCache.data;
+      }
+    }
+    
+    // 캐시가 없거나 만료된 경우 API 호출
+    const apiUrl = `/api/its/api/infoGasPriceList?code=860665`;
+    const response = await axios.get(apiUrl);
+
+    // 응답 데이터 확인
+    if (!response.data || !response.data.info) {
+      console.warn('연료 가격 데이터가 없거나 형식이 올바르지 않습니다.');
+      return { info: [] }; 
+    }
+    
+    // 데이터를 캐시에 저장 (타임스탬프 포함)
+    const cacheData = {
+      timestamp: new Date().getTime(),
+      data: response.data
+    };
+    
+    localStorage.setItem(cacheKey, JSON.stringify(cacheData));
+    console.log('새로운 연료 가격 데이터 캐싱');
+    
+    
+    return response.data;
+  } catch (error) {
+    console.error('연료 가격 정보를 가져오는 중 오류 발생:', error);
+    return { info: [] };
+  }
+};
