@@ -12,11 +12,11 @@
     <main>
       <router-view></router-view>
     </main>
-    <footer class="main-footer" v-if="showFooter">
+    <!-- <footer class="main-footer" v-if="showFooter">
       <div class="container">
         <p>&copy; 2025 GRAP. All rights reserved.</p>
       </div>
-    </footer>
+    </footer> -->
     
     <!-- 사이드바 광고 컴포넌트 -->
     <SidebarAds />
@@ -133,6 +133,7 @@ a:hover {
 
 main {
   flex: 1;
+  position: relative; /* 자식 요소의 절대 위치 기준 */
 }
 
 /* 헤더 스타일 */

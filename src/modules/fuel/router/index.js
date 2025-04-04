@@ -1,5 +1,5 @@
 import Fuel from '@/modules/fuel/Fuel.vue';
-import FuelList from '@/modules/components/fuel/FuelList.vue';
+import FuelList from '@/modules/fuel/components/FuelList.vue';
 
 const fuelRoutes = {
   path: '/fuel',
