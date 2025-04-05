@@ -36,6 +36,6 @@ export function formatDistance(station, userLocation, isCalculatingDistances, lo
     return distanceInKm < 1 ? `도로 ${station.distance}m` : `도로 ${distanceInKm.toFixed(1)}km`;
   } else if (station.distance === Infinity) return '(5km 반경 밖)';
   else if (station.distance === null) return '도로 거리 정보 없음';
-  else if (station.distance === undefined) return isTargetForCalc ? '-' : ''; // 계산 대상이면 '-', 아니면 표시 안 함
+  else if (station.distance === undefined) return isTargetForCalc ? '거리 계산 중...' : ''; // 계산 대상이면 '거리 계산 중...' 표시
   else return '';
 }

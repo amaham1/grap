@@ -78,7 +78,13 @@ const {
   canLoadMore,
   updateMapMarkersInBounds, // composable에서 반환된 이름 사용
   loadMore
-} = useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, selectedCity, mapInstance);
+} = useStationFiltering( // userLocation, calculateDistances 인자 제거
+    fuelInfo,
+    fuelPrices,
+    selectedFuelType,
+    selectedCity,
+    mapInstance
+);
 
 // --- 지도 표시 composable 사용 ---
 const {
@@ -99,6 +105,14 @@ const {
 
 // --- 전체 로딩 상태 ---
 const isLoading = computed(() => isLoadingData.value || isSearching.value);
+const initialCalcDone = ref(false); // 초기 거리 계산 완료 플래그
+
+// 초기 거리 계산 조건 충족 여부
+const isReadyForInitialCalc = computed(() =>
+  !initialCalcDone.value && // 아직 초기 계산 전이고
+  userLocation.value && // 사용자 위치가 있고
+  lowestPriceStations.value && lowestPriceStations.value.length > 0 // 최저가 목록이 있을 때
+);
 
 // --- 생명주기 훅 ---
 onMounted(async () => {
@@ -124,7 +138,7 @@ onMounted(async () => {
 
     // 데이터 로드 후 초기 목록 및 지도 마커 동시 업데이트
     await updateMapMarkersInBounds(true); // composable에서 반환된 이름 사용
-
+    // 초기 거리 계산 로직은 watch에서 처리하도록 이동
   } catch (err) {
     console.error('Error during component mount:', err);
     const mapDiv = document.getElementById('map');
@@ -133,27 +147,58 @@ onMounted(async () => {
 });
 
 // --- Watchers ---
-// 필터 변경 시 목록 및 지도 마커 업데이트
-watch(selectedFuelType, () => {
+// 필터 변경 시 목록/마커 업데이트 및 거리 재계산
+watch(selectedFuelType, async () => { // async 추가
   console.log(`Fuel type changed: ${selectedFuelType.value}. Updating list and map markers...`);
-  updateMapMarkersInBounds(); // composable에서 반환된 이름 사용
-});
-
-watch(selectedCity, () => {
-  console.log(`City filter changed: ${selectedCity.value}. Updating list and map markers...`);
-  updateMapMarkersInBounds(); // composable에서 반환된 이름 사용
-});
-
-// 거리 계산 트리거
-watch([lowestPriceStations, userLocation], ([stations, location]) => {
-  console.log("Watch [lowestPriceStations, userLocation] triggered.");
-  if (stations && stations.length > 0 && location && typeof location.lat === 'number' && typeof location.lng === 'number') {
-    console.log("Conditions met to calculate distances for TOP 10.");
-    calculateDistances(stations, location);
-  } else {
-    console.log("Conditions not met for distance calculation.");
+  await updateMapMarkersInBounds(); // 목록/마커 업데이트 기다림 (선택적)
+  // 목록 업데이트 후 거리 재계산
+  if (userLocation.value && lowestPriceStations.value.length > 0) {
+    console.log("Fuel type changed: Recalculating distances for new TOP 10.");
+    calculateDistances(lowestPriceStations.value, userLocation.value);
   }
-}, { deep: true });
+});
+
+watch(selectedCity, async () => { // async 추가
+  console.log(`City filter changed: ${selectedCity.value}. Updating list and map markers...`);
+  await updateMapMarkersInBounds(); // 목록/마커 업데이트 기다림 (선택적)
+  // 목록 업데이트 후 거리 재계산
+  if (userLocation.value && lowestPriceStations.value.length > 0) {
+    console.log("City filter changed: Recalculating distances for new TOP 10.");
+    calculateDistances(lowestPriceStations.value, userLocation.value);
+  }
+});
+
+// 사용자 위치 변경 또는 초기 로드 시 거리 재계산 트리거
+watch(userLocation, (newLocation, oldLocation) => {
+  // newLocation이 유효하고, (oldLocation이 없거나 || 위치가 실제로 변경되었을 때)
+  if (newLocation && (!oldLocation || newLocation.lat !== oldLocation.lat || newLocation.lng !== oldLocation.lng)) {
+    const isInitialLoad = !oldLocation; // 초기 로드 여부 확인
+    const logPrefix = isInitialLoad ? "Initial location loaded" : "User location changed";
+
+    console.log(`${logPrefix}. Checking conditions to calculate distances for TOP 10.`);
+    // 최저가 목록이 준비되었는지 확인 후 거리 계산 호출
+    if (lowestPriceStations.value && lowestPriceStations.value.length > 0) {
+      console.log(`${logPrefix}: Lowest stations ready. Calculating distances.`);
+      calculateDistances(lowestPriceStations.value, newLocation);
+    } else {
+      console.log(`${logPrefix}: Lowest stations not ready yet. Distance calculation deferred.`);
+      // lowestPriceStations가 나중에 준비되면 필터 watch에서 처리될 수 있음
+      // 또는, lowestPriceStations를 여기서 watch하는 로직을 추가할 수도 있지만,
+      // 현재 구조에서는 필터 watch가 그 역할을 할 것으로 기대됨.
+    }
+  }
+}, { deep: true }); // userLocation 객체 내부 변경 감지
+
+// lowestPriceStations 감시 watch 제거됨
+
+// 초기 로드 시 거리 계산 트리거 (조건 충족 시 단 한번 실행)
+watch(isReadyForInitialCalc, (ready) => {
+  if (ready) {
+    console.log("Conditions met for initial distance calculation.");
+    calculateDistances(lowestPriceStations.value, userLocation.value);
+    initialCalcDone.value = true; // 초기 계산 완료 표시
+  }
+});
 
 // 거리 계산 완료 시 UI 업데이트 (useMapDisplay 내부에서 처리)
 
