@@ -4,7 +4,7 @@
       <div class="container">
         <router-link to="/" class="logo">GRAP</router-link>
         <div class="nav-links">
-          <router-link to="/real-estate" class="nav-link">부동산</router-link>
+          <!-- <router-link to="/real-estate" class="nav-link">부동산</router-link> -->
           <router-link to="/fuel" class="nav-link">주유소</router-link>
         </div>
       </div>

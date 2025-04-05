@@ -21,3 +21,43 @@ export function calculateDistance(lat1, lon1, lat2, lon2) {
   const distance = R * c; // 미터 단위 거리
   return distance;
 }
+
+/**
+ * 브라우저 Geolocation API를 사용하여 현재 위치를 비동기적으로 가져옵니다.
+ * @returns {Promise<GeolocationPosition>} 성공 시 GeolocationPosition 객체를 resolve하는 Promise
+ * @throws {Error} Geolocation API를 지원하지 않거나 위치 정보를 가져오는 데 실패한 경우 Error 객체를 reject하는 Promise
+ */
+export function getCurrentLocation() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not supported by this browser.'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        resolve(position);
+      },
+      (error) => {
+        let errorMessage = 'Unknown error occurred while retrieving location.';
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'User denied the request for Geolocation.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Location information is unavailable.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'The request to get user location timed out.';
+            break;
+        }
+        reject(new Error(errorMessage));
+      },
+      {
+        enableHighAccuracy: true, // 높은 정확도 요청
+        timeout: 10000, // 10초 타임아웃
+        maximumAge: 0 // 캐시된 위치 사용 안 함
+      }
+    );
+  });
+}

@@ -21,11 +21,17 @@
         </button>
       </div>
       <!-- 최저가 주유소 목록 (전체 기준 TOP 10) -->
-      <div v-if="lowestPriceStations.length > 0" class="lowest-price-list">
-        <h4>최저가 주유소 TOP 10</h4>
+      <div v-if="lowestPriceStations.length > 0" class="lowest-price-list" :class="{ 'collapsed': isLowestPriceListCollapsed }">
+        <div class="list-header">
+          <h4>최저가 주유소 TOP 10</h4>
+          <button @click="toggleLowestPriceList" class="toggle-list-btn">
+            {{ isLowestPriceListCollapsed ? '펼치기' : '접기' }}
+          </button>
+        </div>
+        <!-- v-show 제거, v-for 대상을 displayedLowestStations로 변경 -->
         <ul>
           <!-- panToStation 함수는 이제 이 컴포넌트에 있음 -->
-          <li v-for="station in lowestPriceStations" :key="station.id" @click="panToStation(station)">
+          <li v-for="station in displayedLowestStations" :key="station.id" @click="panToStation(station)">
             <div class="station-info">
               <strong>{{ station.osnm }}</strong>
               <!-- formatPrice는 formatters.js에서 가져옴 -->
@@ -35,6 +41,10 @@
             <div class="station-distance">{{ formatDistance(station, userLocation, isCalculatingDistances, lowestPriceStations) }}</div>
           </li>
         </ul>
+        <!-- 더 많은 항목이 있음을 나타내는 시각적 표시 -->
+        <div v-if="isLowestPriceListCollapsed && lowestPriceStations.length > 1" class="more-indicator">
+          <span>...</span>
+        </div>
       </div>
       <!-- '더 보기' 버튼 (지도 내 주유소 기준) -->
       <div v-if="canLoadMore" class="load-more-container">
@@ -44,6 +54,10 @@
       <div v-if="isLoading" class="loading-indicator">데이터를 불러오는 중...</div>
       <div v-if="error" class="error-message">{{ error }}</div>
       <div id="map" :class="{ 'map-hidden': isLoading || error }"></div>
+      <!-- 내 위치로 이동 버튼 -->
+      <button @click="moveToCurrentLocation" class="current-location-btn" title="내 위치로 이동">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L12 6"/><path d="M12 18L12 22"/><path d="M4.93 4.93L7.76 7.76"/><path d="M16.24 16.24L19.07 19.07"/><path d="M2 12L6 12"/><path d="M18 12L22 12"/><path d="M4.93 19.07L7.76 16.24"/><path d="M16.24 7.76L19.07 4.93"/><circle cx="12" cy="12" r="4"/></svg>
+      </button>
     </div>
   </div>
 </template>
@@ -54,7 +68,8 @@ import { useKakaoMap } from '../composables/useKakaoMap';
 import { useFuelInfo } from '../composables/useFuelInfo';
 import { useStationFiltering } from '../composables/useStationFiltering';
 import { useMapDisplay } from '../composables/useMapDisplay';
-import { formatPrice, formatDistance } from '@/utils/formatters';
+import { formatPrice, formatDistance } from '@/utils/formatters'; // 주석 제거
+import { getCurrentLocation } from '@/utils/geolocationUtils'; // getCurrentLocation import 추가
 
 // --- 기본 상태 및 composable 초기화 ---
 const { loadKakaoMapScript, initMap, getCurrentLocationAsync, displayCurrentLocation } = useKakaoMap();
@@ -229,6 +244,40 @@ const panToStation = async (station) => {
   }
 };
 
+// 최저가 목록 접기/펼치기 상태 (기본값 true로 변경)
+const isLowestPriceListCollapsed = ref(true);
+const toggleLowestPriceList = () => {
+  isLowestPriceListCollapsed.value = !isLowestPriceListCollapsed.value;
+};
+
+// 표시할 최저가 주유소 목록 계산 (접힘 상태에 따라 1개 또는 전체)
+const displayedLowestStations = computed(() => {
+  if (isLowestPriceListCollapsed.value) {
+    return lowestPriceStations.value.slice(0, 1); // 접혔을 때는 첫 번째 항목만
+  }
+  return lowestPriceStations.value; // 펼쳤을 때는 전체 항목
+});
+
+// 내 위치로 이동하는 함수
+const moveToCurrentLocation = async () => {
+  if (!mapInstance.value) {
+    console.error("Map instance is not available.");
+    alert("지도를 먼저 로드해주세요.");
+    return;
+  }
+  try {
+    const position = await getCurrentLocation();
+    const currentLatLng = new window.kakao.maps.LatLng(position.coords.latitude, position.coords.longitude);
+    mapInstance.value.panTo(currentLatLng);
+    // userLocation.value 업데이트는 선택 사항 (이미 onMounted에서 처리)
+    // 필요 시 현재 위치 마커 업데이트 로직 추가
+    console.log("Moved map to current location:", currentLatLng);
+  } catch (error) {
+    console.error("Error getting current location:", error);
+    alert(`현재 위치를 가져오는 데 실패했습니다: ${error.message}`);
+  }
+};
+
 </script>
 
 <style scoped>
@@ -312,17 +361,38 @@ const panToStation = async (station) => {
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
   z-index: 10;
   overflow-y: auto; /* 내용 많으면 스크롤 */
-  padding: 10px;
+  padding: 0 10px 10px 10px; /* 상단 패딩 제거, 헤더에서 처리 */
+  transition: max-height 0.3s ease-out; /* 접기/펼치기 애니메이션 */
+}
+
+/* .collapsed 스타일에서 max-height와 overflow 제거 */
+.lowest-price-list.collapsed {
+  /* max-height와 overflow 제거 */
+  padding-bottom: 10px; /* 접혔을 때도 하단 패딩 유지 (선택 사항) */
+}
+
+.list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0; /* 헤더 상하 패딩 */
+  border-bottom: 1px solid #eee;
+  margin-bottom: 5px; /* 헤더와 목록 사이 간격 */
 }
 
 .lowest-price-list h4 {
-  margin-top: 0;
-  margin-bottom: 10px;
+  margin: 0; /* 기본 마진 제거 */
   font-size: 14px;
   font-weight: bold;
-  text-align: center;
-  border-bottom: 1px solid #eee;
-  padding-bottom: 8px;
+}
+
+.toggle-list-btn {
+  background: none;
+  border: none;
+  color: #007bff;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 5px;
 }
 
 .lowest-price-list ul {
@@ -447,6 +517,35 @@ const panToStation = async (station) => {
 
 .error-message {
   background-color: rgba(220, 53, 69, 0.8); /* 빨간색 배경 */
+}
+
+/* 내 위치로 이동 버튼 스타일 */
+.current-location-btn {
+  position: absolute;
+  bottom: 90px; /* '더 보기' 버튼 위 또는 적절한 위치 */
+  right: 20px;
+  z-index: 10;
+  background-color: white;
+  border: 1px solid #ccc;
+  border-radius: 50%; /* 원형 버튼 */
+  width: 40px;
+  height: 40px;
+  padding: 0; /* 내부 여백 제거 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  transition: background-color 0.2s, box-shadow 0.2s;
+}
+
+.current-location-btn:hover {
+  background-color: #f8f8f8;
+  box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+}
+
+.current-location-btn svg {
+  color: #555; /* 아이콘 색상 */
 }
 
 </style>
