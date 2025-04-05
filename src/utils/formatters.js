@@ -33,7 +33,8 @@ export function formatDistance(station, userLocation, isCalculatingDistances, lo
   if (isCalculatingDistances && isTargetForCalc && station.distance === undefined) return '거리 계산 중...';
   if (typeof station.distance === 'number' && station.distance !== Infinity) {
     const distanceInKm = station.distance / 1000;
-    return distanceInKm < 1 ? `자동차 거리 ${station.distance}m` : `자동차 거리 ${distanceInKm.toFixed(1)}km`;
+    // 1km 미만일 경우 m 단위로 반올림하여 표시
+    return distanceInKm < 1 ? `자동차 거리 ${Math.round(station.distance)}m` : `자동차 거리 ${distanceInKm.toFixed(1)}km`;
   } else if (station.distance === Infinity) return '(5km 반경 밖)';
   else if (station.distance === null) return '도로 거리 정보 없음';
   else if (station.distance === undefined) return isTargetForCalc ? '거리 계산 중...' : ''; // 계산 대상이면 '거리 계산 중...' 표시

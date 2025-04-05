@@ -1,7 +1,9 @@
 // src/modules/fuel/composables/useStationFiltering.js
 import { ref, computed, watch, nextTick } from 'vue';
+import { calculateDistance } from '@/utils/geolocationUtils'; // calculateDistance import 추가
 
-export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, selectedCity, mapInstance) {
+// userLocation 인자 추가
+export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, selectedCity, mapInstance, userLocation) {
   const stationsInBounds = ref([]); // 지도 범위 내 필터링된 주유소 (마커 표시용)
   // lowestPriceStations를 computed로 변경
   const visibleStations = ref([]); // 실제로 지도에 표시될 주유소 (stationsInBounds 기반)
@@ -14,20 +16,24 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
   // '더 보기' 버튼 표시 여부 (지도 내 주유소 기준)
   const canLoadMore = computed(() => stationsInBounds.value.length > visibleStations.value.length);
 
-  // lowestPriceStations를 computed 속성으로 정의
+  // 최저가 주유소 TOP 10을 가까운 순으로 정렬하여 계산하는 computed 속성
   const lowestPriceStations = computed(() => {
-    // 의존성: fuelInfo, fuelPrices, selectedFuelType, selectedCity
+    // 의존성: fuelInfo, fuelPrices, selectedFuelType, selectedCity, userLocation
     if (!Array.isArray(fuelInfo.value) || fuelInfo.value.length === 0 || Object.keys(fuelPrices.value).length === 0) {
-      console.warn("[Filtering Computed] Data not ready for lowest price list.");
+      console.warn("[Filtering Computed] Data not ready for lowest price station list.");
       return [];
     }
-    console.log("[Filtering Computed] Calculating lowest price list based on filters...");
+    console.log("[Filtering Computed] Calculating lowest price stations, sorted by distance...");
 
+    // 1. 선택된 유종/도시 기준으로 모든 주유소 필터링
     const allFilteredStations = fuelInfo.value.filter(station => {
       const prices = fuelPrices.value[station.id];
       const cityFilter = selectedCity.value === '전체' || (station.adr && station.adr.includes(selectedCity.value));
       const price = prices ? prices[selectedFuelType.value] : undefined;
       const hasValidPrice = typeof price === 'number' && price > 0;
+
+      // 좌표 정보가 없는 주유소 제외 (거리 계산 위해 필요)
+      if (!station.lat || !station.lng) return false;
 
       if (selectedFuelType.value === 'lpg') {
         return hasValidPrice && cityFilter && station.lpgyn === 'Y';
@@ -35,17 +41,44 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
       return hasValidPrice && cityFilter;
     });
 
+    // 2. 가격순으로 정렬
     allFilteredStations.sort((a, b) => {
-        const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
-        const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
-        return priceA - priceB;
+      const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
+      const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
+      return priceA - priceB;
     });
 
-    const top10 = allFilteredStations.slice(0, 10);
-    console.log(`[Filtering Computed] Found ${top10.length} lowest price stations.`);
-    // computed는 내부 요소의 변경(distance)도 감지하여 재계산하므로,
-    // distance가 포함된 최신 station 객체를 반환함.
-    return top10;
+    // 3. 상위 10개 추출 (최저가 TOP 10)
+    const top10LowestPrice = allFilteredStations.slice(0, 10);
+
+    // 4. 사용자 위치가 있으면 거리 계산 및 추가
+    let top10WithDistance = top10LowestPrice;
+    if (userLocation.value && userLocation.value.lat && userLocation.value.lng) {
+      console.log("[Filtering Computed] Calculating distances for top 10 lowest price stations.");
+      top10WithDistance = top10LowestPrice.map(station => ({
+        ...station,
+        distance: calculateDistance(
+          userLocation.value.lat,
+          userLocation.value.lng,
+          station.lat,
+          station.lng
+        )
+      }));
+
+      // 5. 거리순 (가까운 순)으로 다시 정렬
+      top10WithDistance.sort((a, b) => {
+        const distA = typeof a.distance === 'number' ? a.distance : Infinity;
+        const distB = typeof b.distance === 'number' ? b.distance : Infinity;
+        return distA - distB;
+      });
+    } else {
+      // 사용자 위치 없으면 distance 속성 null로 설정 (정렬은 가격순 유지)
+      console.log("[Filtering Computed] User location not available, skipping distance calculation and sorting.");
+      top10WithDistance = top10LowestPrice.map(station => ({ ...station, distance: null }));
+    }
+
+    console.log(`[Filtering Computed] Final list contains ${top10WithDistance.length} stations.`);
+    return top10WithDistance;
   });
 
   // currentMinPrice도 computed로 정의

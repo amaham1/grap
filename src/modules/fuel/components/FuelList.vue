@@ -23,7 +23,11 @@
       <!-- 최저가 주유소 목록 (전체 기준 TOP 10) -->
       <div v-if="lowestPriceStations.length > 0" class="lowest-price-list" :class="{ 'collapsed': isLowestPriceListCollapsed }">
         <div class="list-header">
-          <h4>최저가 주유소 TOP 10</h4>
+          <div class="header-left">
+            <!-- 제목 수정 -->
+            <h4>최저가 TOP 10 (가까운 순)</h4>
+            <!-- 거리순 토글 버튼 제거 -->
+          </div>
           <button @click="toggleLowestPriceList" class="toggle-list-btn">
             {{ isLowestPriceListCollapsed ? '펼치기' : '접기' }}
           </button>
@@ -93,12 +97,13 @@ const {
   canLoadMore,
   updateMapMarkersInBounds, // composable에서 반환된 이름 사용
   loadMore
-} = useStationFiltering( // userLocation, calculateDistances 인자 제거
+} = useStationFiltering(
     fuelInfo,
     fuelPrices,
     selectedFuelType,
     selectedCity,
-    mapInstance
+    mapInstance,
+    userLocation // userLocation 인자 추가
 );
 
 // --- 지도 표시 composable 사용 ---
@@ -250,12 +255,20 @@ const toggleLowestPriceList = () => {
   isLowestPriceListCollapsed.value = !isLowestPriceListCollapsed.value;
 };
 
-// 표시할 최저가 주유소 목록 계산 (접힘 상태에 따라 1개 또는 전체)
+// 정렬 방향 관리 로직 제거 (항상 가까운 순)
+// 중복된 toggleLowestPriceList 함수 정의 제거
+
+// 표시할 최저가 주유소 목록 계산 (정렬 및 접힘 상태 반영)
 const displayedLowestStations = computed(() => {
+  let stations = [...lowestPriceStations.value]; // 원본 배열 복사
+
+  // 정렬 로직 제거 (lowestPriceStations가 이미 거리순으로 정렬됨)
+
+  // 접힘 상태 반영
   if (isLowestPriceListCollapsed.value) {
-    return lowestPriceStations.value.slice(0, 1); // 접혔을 때는 첫 번째 항목만
+    return stations.slice(0, 1);
   }
-  return lowestPriceStations.value; // 펼쳤을 때는 전체 항목
+  return stations;
 });
 
 // 내 위치로 이동하는 함수
@@ -380,11 +393,20 @@ const moveToCurrentLocation = async () => {
   margin-bottom: 5px; /* 헤더와 목록 사이 간격 */
 }
 
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* 제목과 정렬 버튼 사이 간격 */
+}
+
 .lowest-price-list h4 {
   margin: 0; /* 기본 마진 제거 */
   font-size: 14px;
   font-weight: bold;
+  white-space: nowrap; /* 제목 줄바꿈 방지 */
 }
+
+/* .sort-options 및 .distance-sort-btn 스타일 제거됨 */
 
 .toggle-list-btn {
   background: none;
