@@ -5,9 +5,8 @@ import { formatPrice, formatStationDistance } from '@/utils/formatters'; // Impo
 // currentMinPrice 인자 추가
 export function useMapDisplay(mapInstance, visibleStations, allFilteredStations, lowestPriceStations, fuelInfo, fuelPrices, selectedFuelType, fuelTypes, userLocation, isCalculatingDistances, isSingleStationView, selectedSingleStation, currentMinPrice) {
   const markers = ref([]);
-  const infowindows = ref([]);
-  const openInfowindow = reactive({}); // 현재 열려있는 인포윈도우 추적
-
+  const customOverlays = ref([]); // 커스텀 오버레이 배열
+  const openCustomOverlay = reactive({}); // 현재 열려있는 커스텀 오버레이 추적
   // --- Helper Functions ---
 
   // 인포윈도우 콘텐츠 생성 함수
@@ -27,7 +26,7 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
     `;
   };
 
-  // 마커 및 인포윈도우 생성 및 이벤트 리스너 추가 함수
+  // 마커 및 커스텀 오버레이 생성 및 이벤트 리스너 추가 함수
   const createMarkerAndInfowindow = (station, isLowest) => {
     if (!station || !station.lat || !station.lng) return null;
 
@@ -45,24 +44,26 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
       image: markerImage
     });
 
-    const infowindowContent = createInfowindowContent(station, isLowest);
-    const infowindow = new window.kakao.maps.InfoWindow({
-      content: infowindowContent,
-      removable: true
+    const customOverlayContent = createInfowindowContent(station, isLowest);
+    // InfoWindow 대신 CustomOverlay 사용
+    const customOverlay = new window.kakao.maps.CustomOverlay({
+      content: customOverlayContent,
+      position: markerPosition,
+      yAnchor: 1.5 // 마커 위에 표시되도록 yAnchor 값을 더 크게 조정
     });
 
     window.kakao.maps.event.addListener(marker, 'click', () => {
-      // 다른 인포윈도우 닫기
-      Object.keys(openInfowindow).forEach(markerId => {
-        if (openInfowindow[markerId]) openInfowindow[markerId].close();
-        delete openInfowindow[markerId];
+      // 다른 커스텀 오버레이 닫기
+      Object.keys(openCustomOverlay).forEach(markerId => {
+        if (openCustomOverlay[markerId]) openCustomOverlay[markerId].setMap(null); // setMap(null)로 닫기
+        delete openCustomOverlay[markerId];
       });
-      // 현재 인포윈도우 열기
-      infowindow.open(mapInstance.value, marker);
-      openInfowindow[station.id] = infowindow; // 열린 상태 추적
+      // 현재 커스텀 오버레이 열기
+      customOverlay.setMap(mapInstance.value); // setMap(map)으로 열기
+      openCustomOverlay[station.id] = customOverlay; // 열린 상태 추적
     });
 
-    return { marker, infowindow };
+    return { marker, customOverlay }; // infowindow 대신 customOverlay 반환
   };
 
   // --- Main Display Logic ---
@@ -72,15 +73,15 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
   const displayMarkers = () => {
     if (!mapInstance.value) return;
 
-    // 기존 마커 및 인포윈도우 제거 (공통)
-    infowindows.value.forEach(infowindow => infowindow.close());
-    infowindows.value = [];
+    // 기존 마커 및 커스텀 오버레이 제거 (공통)
+    customOverlays.value.forEach(overlay => overlay.setMap(null)); // setMap(null)로 닫기
+    customOverlays.value = [];
     markers.value.forEach(marker => marker.setMap(null));
     markers.value = [];
-    Object.keys(openInfowindow).forEach(key => delete openInfowindow[key]);
+    Object.keys(openCustomOverlay).forEach(key => delete openCustomOverlay[key]);
 
     const newMarkers = [];
-    const newInfowindows = [];
+    const newCustomOverlays = []; // 새 커스텀 오버레이 배열
 
     // --- 단일 주유소 보기 모드 처리 --- (기존과 동일)
     if (isSingleStationView.value && selectedSingleStation.value) {
@@ -98,10 +99,10 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
 
       if (created) {
         newMarkers.push(created.marker);
-        newInfowindows.push(created.infowindow);
-        // 단일 보기 시 인포윈도우 바로 열기
-        created.infowindow.open(mapInstance.value, created.marker);
-        openInfowindow[station.id] = created.infowindow; // 상태 관리
+        newCustomOverlays.push(created.customOverlay);
+        // 단일 보기 시 커스텀 오버레이 바로 열기
+        created.customOverlay.setMap(mapInstance.value); // setMap(map)으로 열기
+        openCustomOverlay[station.id] = created.customOverlay; // 상태 관리
         created.marker.setMap(mapInstance.value);
       }
 
@@ -128,18 +129,19 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
 
         if (created) {
           newMarkers.push(created.marker);
-          newInfowindows.push(created.infowindow);
-          // 일반 모드에서도 인포윈도우 바로 열기
-          created.infowindow.open(mapInstance.value, created.marker);
-          openInfowindow[station.id] = created.infowindow; // 상태 관리 추가
+          newCustomOverlays.push(created.customOverlay);
+          // 일반 모드에서도 커스텀 오버레이 바로 열기
+          created.customOverlay.setMap(mapInstance.value); // setMap(map)으로 열기
+          openCustomOverlay[station.id] = created.customOverlay; // 상태 관리 추가
           created.marker.setMap(mapInstance.value);
         }
       });
     }
 
     // 최종 마커 및 인포윈도우 상태 업데이트
+    // 최종 마커 및 커스텀 오버레이 상태 업데이트
     markers.value = newMarkers;
-    infowindows.value = newInfowindows;
+    customOverlays.value = newCustomOverlays;
   };
 
   // panToStation 함수 제거 (FuelList.vue로 이동)
@@ -170,8 +172,8 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
 
   return {
     markers,
-    infowindows,
-    openInfowindow,
+    customOverlays, // infowindows 대신 customOverlays 반환
+    openCustomOverlay, // openInfowindow 대신 openCustomOverlay 반환
     displayMarkers
     // panToStation 제거
   };
