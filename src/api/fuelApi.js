@@ -60,7 +60,8 @@ const parseAndTransformFuelData = (jsonString) => {
 
 // 제주 주유소 기본 정보 API 호출 함수
 export const fetchFuelInfo = async () => {
-  const apiUrl = '/api/its/api/infoGasInfoList?code=860665';
+  // 환경 변수에서 API 기본 URL 가져오기 (프로덕션 빌드 시)
+  const apiUrl = `http://api.jejuits.go.kr/api/infoGasInfoList?code=860665`;
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
@@ -77,7 +78,8 @@ export const fetchFuelInfo = async () => {
 
 // 제주 주유소 유가 정보 API 호출 함수
 export const fetchFuelPrices = async () => {
-  const apiUrl = '/api/its/api/infoGasPriceList?code=860665';
+  // 환경 변수에서 API 기본 URL 가져오기 (프로덕션 빌드 시)
+  const apiUrl = `http://api.jejuits.go.kr/api/infoGasInfoList?code=860665`;
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
