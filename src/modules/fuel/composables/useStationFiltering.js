@@ -21,7 +21,8 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
   // 공통 필터링 로직 함수
   const filterStations = (station) => {
     const prices = fuelPrices.value[station.id];
-    const cityFilter = selectedCity.value === '전체' || (station.adr && station.adr.includes(selectedCity.value));
+    // '전체' 조건 제거: selectedCity 값이 '전체'가 아닌 실제 도시 이름일 때만 필터링
+    const cityFilter = station.adr && station.adr.includes(selectedCity.value);
     const price = prices ? prices[selectedFuelType.value] : undefined;
     const hasValidPrice = typeof price === 'number' && price > 0;
 
@@ -34,24 +35,38 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     return hasValidPrice && cityFilter;
   };
 
-  // 정렬 함수 (가격 우선, 거리 차선)
+  // 정렬 함수 (가격 우선, 제주시 우선, 거리 차선)
   const sortStations = (a, b) => {
     const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
     const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
 
-    // 가격이 다르면 가격으로 정렬
+    // 1. 가격 비교
     if (priceA !== priceB) {
       return priceA - priceB;
     }
 
-    // 가격이 같으면 거리로 정렬 (userLocation이 있을 경우)
+    // 2. 가격이 같으면 제주시 우선 정렬
+    const isAJeju = a.adr && a.adr.includes('제주시');
+    const isBJeju = b.adr && b.adr.includes('제주시');
+
+    if (isAJeju && !isBJeju) {
+      return -1; // a가 제주시, b는 아니면 a 우선
+    }
+    if (!isAJeju && isBJeju) {
+      return 1; // b가 제주시, a는 아니면 b 우선
+    }
+
+    // 3. 둘 다 제주시거나 둘 다 아니면 거리로 정렬 (userLocation이 있을 경우)
     if (userLocation.value) {
       const distA = typeof a.distance === 'number' ? a.distance : Infinity;
       const distB = typeof b.distance === 'number' ? b.distance : Infinity;
+      // 거리가 유효하지 않은 경우(Infinity)를 뒤로 보내기 위한 처리 추가 가능
+      if (distA === Infinity && distB !== Infinity) return 1;
+      if (distA !== Infinity && distB === Infinity) return -1;
       return distA - distB;
     }
 
-    return 0; // 사용자 위치 없으면 가격순 유지
+    return 0; // 사용자 위치 없으면 가격 및 제주시 우선 순서 유지
   };
 
   // --- Computed Properties ---

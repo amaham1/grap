@@ -111,7 +111,7 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
       if (!Array.isArray(visibleStations.value) || visibleStations.value.length === 0) { // Check visibleStations
         // console.log("No stations to display in the current map view.");
         markers.value = [];
-        infowindows.value = [];
+        customOverlays.value = []; // infowindows -> customOverlays 로 수정
         return;
       }
       // console.log(`Displaying ${visibleStations.value.length} markers in the current map view.`); // Log uses visibleStations

@@ -82,13 +82,14 @@ const { fuelInfo, fuelPrices, isLoading: isLoadingData, error, getFuelData, calc
 const mapInstance = ref(null);
 const userLocation = ref(null);
 const selectedFuelType = ref('gasoline');
-const selectedCity = ref('전체');
+const selectedCity = ref('제주시'); // 기본 선택 도시를 '제주시'로 변경
 const isSingleStationView = ref(false); // 단일 주유소 보기 모드 상태
 const selectedSingleStation = ref(null); // 단일 보기 시 선택된 주유소
 
 // --- 상수 정의 ---
 const fuelTypes = [ { text: '휘발유', value: 'gasoline' }, { text: '고급휘발유', value: 'premium_gasoline' }, { text: '경유', value: 'diesel' }, { text: 'LPG', value: 'lpg' }];
-const cities = [ { text: '전체', value: '전체' }, { text: '제주시', value: '제주시' }, { text: '서귀포시', value: '서귀포시' }];
+// '전체' 옵션 제거
+const cities = [ { text: '제주시', value: '제주시' }, { text: '서귀포시', value: '서귀포시' }];
 
 // --- 필터링 composable 사용 ---
 const {
@@ -581,6 +582,82 @@ const searchInCurrentMap = () => {
 
 .current-location-btn svg {
   color: #555; /* 아이콘 색상 */
+}
+/* 모바일 반응형 스타일 */
+@media (max-width: 768px) {
+  .fuel-type-selector {
+    position: relative; /* 절대 위치 해제 */
+    top: unset;
+    left: unset;
+    transform: none;
+    width: calc(100% - 20px); /* 좌우 여백 고려 */
+    margin: 10px auto; /* 상하좌우 여백 및 가운데 정렬 */
+    padding: 8px 10px;
+    flex-wrap: wrap; /* 줄바꿈 허용 */
+    justify-content: center; /* 가운데 정렬 */
+    gap: 10px; /* 내부 간격 조정 */
+    border-radius: 10px; /* 모서리 둥글기 조정 */
+  }
+
+  .fuel-type-selector label {
+    margin: 0 5px; /* 좌우 마진 줄임 */
+    font-size: 13px; /* 폰트 크기 조정 */
+  }
+
+  .city-selector {
+    position: relative;
+    top: unset;
+    left: unset;
+    width: calc(100% - 20px);
+    margin: 10px auto;
+    padding: 8px 10px;
+    justify-content: center;
+    gap: 15px; /* 도시 간 간격 조정 */
+  }
+
+  .search-button-container {
+    position: relative;
+    top: unset;
+    left: unset;
+    width: 100%; /* 전체 너비 사용 */
+    text-align: center; /* 버튼 가운데 정렬 */
+    margin: 10px 0; /* 상하 여백 */
+  }
+
+  .search-btn {
+    width: calc(100% - 40px); /* 버튼 너비 조정 */
+    max-width: 300px; /* 최대 너비 제한 */
+  }
+
+  .lowest-price-list {
+    position: relative;
+    top: unset;
+    left: unset;
+    width: calc(100% - 20px); /* 좌우 여백 고려 */
+    margin: 10px auto; /* 상하 여백 및 가운데 정렬 */
+    max-height: 250px; /* 모바일 높이 제한 */
+  }
+
+  .current-location-btn {
+    bottom: 20px; /* 하단 여백 조정 */
+    right: 15px; /* 우측 여백 조정 */
+    width: 35px; /* 버튼 크기 약간 줄임 */
+    height: 35px;
+  }
+  .current-location-btn img {
+      width: 18px;
+      height: 18px;
+  }
+
+  .load-more-container {
+    position: relative;
+    bottom: unset;
+    left: unset;
+    transform: none;
+    width: 100%;
+    text-align: center;
+    margin: 15px 0; /* 상하 여백 */
+  }
 }
 
 </style>
