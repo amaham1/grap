@@ -12,7 +12,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
-import GoogleAd from './GoogleAd.vue';
+// 중복된 import 제거
+import GoogleAd from './GoogleAd.vue'; // 동일 폴더 내 상대 경로 사용
 
 const route = useRoute();
 

@@ -208,7 +208,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted, watch } from 'vue';
-import { formatAmount } from '@/modules/real-estate/utils/formatters';
+import { formatAmount } from '@/utils/formatters';
 import { formatDealDate } from '@/modules/real-estate/utils/dateUtils';
 import { realEstateApi } from '@/api/realEstateApi';
 import { debounce } from 'lodash';

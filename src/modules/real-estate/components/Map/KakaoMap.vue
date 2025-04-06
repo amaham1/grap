@@ -7,7 +7,7 @@
 
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue';
-import { initKakaoMap } from '@/api/kakaoMapApi';
+import { useKakaoMap } from '@/modules/fuel/composables/useKakaoMap'; // useKakaoMap import (경로 확인 필요)
 
 const props = defineProps({
   latitude: {
@@ -20,46 +20,41 @@ const props = defineProps({
   }
 });
 
-const map = ref(null);
+const mapInstance = ref(null); // map -> mapInstance 이름 변경 (composable과 일치)
 const marker = ref(null);
-
+const { loadKakaoMapScript, initMap } = useKakaoMap(); // composable 사용
 const initializeMap = async () => {
   try {
-    // 카카오맵 SDK 초기화
-    await initKakaoMap();
-    
-    // 지도 컨테이너 확인
-    const container = document.getElementById('map');
-    if (!container) {
-      console.warn('지도를 표시할 DOM 요소를 찾을 수 없습니다.');
-      return;
+    // 스크립트 로드
+    if (!window.kakao || !window.kakao.maps) {
+      await loadKakaoMapScript(); // libraries 필요 없음
     }
 
-    
-    // 지도 옵션 설정
-    const options = {
-      center: new window.kakao.maps.LatLng(props.latitude, props.longitude),
-      level: 3
-    };
+    // 지도 초기화 (useKakaoMap 사용)
+    const initialCenter = { lat: props.latitude, lng: props.longitude };
+    const { mapInstance: initializedMap, error: mapError } = initMap('map', initialCenter, 3); // level 3
 
-    console.log("real estate ", options);
-    
-    // 새 지도 인스턴스 생성
-    map.value = new window.kakao.maps.Map(container, options);
+    if (mapError) {
+      throw new Error(mapError);
+    }
+    if (!initializedMap || !initializedMap.value) {
+      throw new Error("Failed to get map instance.");
+    }
+    mapInstance.value = initializedMap.value; // mapInstance ref에 할당
 
-    // 마커 생성
+    // 마커 생성 (지도 인스턴스 사용)
     marker.value = new window.kakao.maps.Marker({
       position: new window.kakao.maps.LatLng(props.latitude, props.longitude),
-      map: map.value
+      map: mapInstance.value // mapInstance 사용
     });
 
-    // 지도 크기 재조정
-    window.kakao.maps.event.addListener(map.value, 'idle', function() {
-      map.value.relayout();
+    // 지도 크기 재조정 (mapInstance 사용)
+    window.kakao.maps.event.addListener(mapInstance.value, 'idle', function() {
+      mapInstance.value.relayout();
     });
 
   } catch (error) {
-    console.error('카카오맵 초기화 중 오류 발생:', error);
+    console.error('카카오맵 초기화 중 오류 발생:', error.message); // error.message 사용
   }
 };
 
@@ -74,8 +69,8 @@ onUnmounted(() => {
     marker.value.setMap(null);
     marker.value = null;
   }
-  if (map.value) {
-    map.value = null;
+  if (mapInstance.value) { // mapInstance 사용
+    mapInstance.value = null;
   }
 });
 </script>

@@ -16,7 +16,7 @@
       </div>
       <div class="search-button-container">
         <!-- 버튼 클릭 시 updateMapMarkersInBounds 호출 -->
-        <button @click="updateMapMarkersInBounds" :disabled="isSearching || isLoading" class="search-btn">
+        <button @click="searchInCurrentMap" :disabled="isSearching || isLoading" class="search-btn">
           {{ isSearching ? '검색 중...' : '현재 지도에서 검색' }}
         </button>
       </div>
@@ -42,7 +42,7 @@
               <span class="price">{{ formatPrice(station.id, fuelPrices, selectedFuelType, fuelTypes) }}</span>
             </div>
             <!-- formatDistance는 formatters.js에서 가져옴 -->
-            <div class="station-distance">{{ formatDistance(station, userLocation, isCalculatingDistances, lowestPriceStations) }}</div>
+            <div class="station-distance">{{ formatStationDistance(station, userLocation, isCalculatingDistances, lowestPriceStations) }}</div>
           </li>
         </ul>
         <!-- 더 많은 항목이 있음을 나타내는 시각적 표시 -->
@@ -68,15 +68,15 @@
 
 <script setup>
 import { onMounted, ref, watch, computed, reactive } from 'vue';
-import { useKakaoMap } from '../composables/useKakaoMap';
+import { useKakaoMap } from '../composables/useKakaoMap'; // 원래 상대 경로로 복구
 import { useFuelInfo } from '../composables/useFuelInfo';
 import { useStationFiltering } from '../composables/useStationFiltering';
 import { useMapDisplay } from '../composables/useMapDisplay';
-import { formatPrice, formatDistance } from '@/utils/formatters'; // 주석 제거
+import { formatPrice, formatStationDistance } from '@/utils/formatters'; // formatDistance -> formatStationDistance
 import { getCurrentLocation } from '@/utils/geolocationUtils'; // getCurrentLocation import 추가
 
 // --- 기본 상태 및 composable 초기화 ---
-const { loadKakaoMapScript, initMap, getCurrentLocationAsync, displayCurrentLocation } = useKakaoMap();
+const { loadKakaoMapScript, initMap, displayCurrentLocation } = useKakaoMap(); // getCurrentLocationAsync 제거
 const { fuelInfo, fuelPrices, isLoading: isLoadingData, error, getFuelData, calculateDistances, isCalculatingDistances } = useFuelInfo();
 
 const mapInstance = ref(null);
@@ -95,11 +95,12 @@ const {
   stationsInBounds,
   lowestPriceStations,
   visibleStations,
-  filteredStations, // <<-- 새로 추가된 반환값 받기
+  filteredStations,
   isSearching,
   canLoadMore,
-  updateMapMarkersInBounds, // composable에서 반환된 이름 사용
-  loadMore
+  updateMapMarkersInBounds,
+  loadMore,
+  currentMinPrice // currentMinPrice 추가
 } = useStationFiltering(
     fuelInfo,
     fuelPrices,
@@ -116,8 +117,8 @@ const {
   displayMarkers
 } = useMapDisplay(
     mapInstance,
-    stationsInBounds,
-    filteredStations,
+    visibleStations,
+    filteredStations, // allFilteredStations 전달 (useStationFiltering에서 반환)
     lowestPriceStations,
     fuelInfo,
     fuelPrices,
@@ -125,8 +126,9 @@ const {
     ref(fuelTypes),
     userLocation,
     isCalculatingDistances,
-    isSingleStationView, // <<-- 단일 보기 상태 전달
-    selectedSingleStation // <<-- 선택된 단일 주유소 전달
+    isSingleStationView,
+    selectedSingleStation,
+    currentMinPrice // currentMinPrice 전달 (useStationFiltering에서 반환)
 );
 
 // --- 전체 로딩 상태 ---
@@ -144,13 +146,18 @@ const isReadyForInitialCalc = computed(() =>
 onMounted(async () => {
   let initialCenter = { lat: 33.4996, lng: 126.5312 };
   try {
-    const fetchedLocation = await getCurrentLocationAsync();
-    if (fetchedLocation) {
-      initialCenter = fetchedLocation;
-      userLocation.value = fetchedLocation;
-    } else {
-      userLocation.value = null;
-    }
+    // getCurrentLocation 사용 (geolocationUtils에서 import)
+    const position = await getCurrentLocation();
+    const fetchedLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+    initialCenter = fetchedLocation;
+    userLocation.value = fetchedLocation; // userLocation 업데이트
+  } catch (locationError) {
+    console.error("Failed to get initial location:", locationError);
+    userLocation.value = null; // 위치 가져오기 실패 시 null 설정
+  }
+
+  // 지도 초기화 및 데이터 로드는 try-catch 블록 밖으로 이동 (위치 실패해도 진행)
+  try {
 
     if (!window.kakao || !window.kakao.maps) await loadKakaoMapScript();
 
@@ -167,8 +174,8 @@ onMounted(async () => {
     isSingleStationView.value = false;
     await updateMapMarkersInBounds(true); // composable에서 반환된 이름 사용
     // 초기 거리 계산 로직은 watch에서 처리하도록 이동
-  } catch (err) {
-    console.error('Error during component mount:', err);
+  } catch (mountError) { // mount 관련 에러 처리
+    console.error('Error during component mount (map/data loading):', mountError);
     const mapDiv = document.getElementById('map');
     if (mapDiv) mapDiv.innerHTML = '지도 또는 데이터를 불러오는 중 오류가 발생했습니다.';
   }
@@ -285,6 +292,17 @@ const moveToCurrentLocation = async () => {
     alert(`현재 위치를 가져오는 데 실패했습니다: ${error.message}`);
   }
 };
+
+// '현재 지도에서 검색' 버튼 클릭 핸들러
+const searchInCurrentMap = () => {
+  if (isSingleStationView.value) {
+    isSingleStationView.value = false; // 단일 보기 모드 해제
+    // 상태 변경 후 마커 업데이트가 watch에서 처리될 때까지 잠시 기다릴 수 있음
+    // 하지만 updateMapMarkersInBounds가 stationsInBounds를 변경하므로 watch가 트리거됨
+    console.log("Exited single station view by searching in map.");
+  }
+  updateMapMarkersInBounds(); // 기존 검색 로직 호출
+}; // <<-- 올바른 닫는 중괄호와 세미콜론
 
 </script>
 

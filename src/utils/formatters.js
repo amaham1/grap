@@ -25,7 +25,7 @@ export function formatPrice(stationId, fuelPrices, selectedFuelType, fuelTypes) 
  * @param {Array<object>} lowestPriceStations - 최저가 주유소 목록 (거리 계산 대상 확인용)
  * @returns {string} 포맷팅된 거리 문자열
  */
-export function formatDistance(station, userLocation, isCalculatingDistances, lowestPriceStations) {
+export function formatStationDistance(station, userLocation, isCalculatingDistances, lowestPriceStations) {
   if (!userLocation) return '위치 정보 없음';
 
   const isTargetForCalc = lowestPriceStations.some(s => s.id === station.id);
@@ -40,3 +40,23 @@ export function formatDistance(station, userLocation, isCalculatingDistances, lo
   else if (station.distance === undefined) return isTargetForCalc ? '거리 계산 중...' : ''; // 계산 대상이면 '거리 계산 중...' 표시
   else return '';
 }
+
+/**
+ * 거리를 미터 또는 킬로미터 단위로 포맷팅 (단순 변환)
+ * @param {number} meters - 미터 단위의 거리
+ * @returns {string} 포맷팅된 거리 문자열
+ */
+export const formatDistance = (meters) => {
+  if (typeof meters !== 'number' || meters < 0) return ''; // 유효성 검사 추가
+  return meters < 1000 ? `${meters}m` : `${(meters / 1000).toFixed(1)}km`;
+};
+
+/**
+ * 숫자를 천 단위 구분자가 있는 문자열로 포맷팅
+ * @param {number} amount - 포맷팅할 숫자
+ * @returns {string} 포맷팅된 숫자 문자열
+ */
+export const formatAmount = (amount) => {
+  if (typeof amount !== 'number') return ''; // 유효성 검사 추가
+  return amount.toLocaleString(); // toLocaleString() 사용이 더 간결하고 안전함
+};

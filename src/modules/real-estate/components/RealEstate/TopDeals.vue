@@ -39,7 +39,7 @@
 import { ref, watch, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { realEstateApi } from '@/api/realEstateApi';
-import { formatAmount } from '@/modules/real-estate/utils/formatters';
+import { formatAmount } from '@/utils/formatters';
 import { formatDate, formatDealDate } from '@/modules/real-estate/utils/dateUtils';
 
 const router = useRouter();

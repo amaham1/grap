@@ -37,7 +37,7 @@
 import { ref, onMounted, watchEffect } from 'vue';
 import { searchNearbyHospitals } from '@/api/kakaoMapApi';
 import { openKakaoMap } from '@/modules/real-estate/utils/kakaoMap';
-import { formatDistance } from '@/modules/real-estate/utils/formatters';
+import { formatDistance } from '@/utils/formatters';
 
 const props = defineProps({
   latitude: {

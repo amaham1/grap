@@ -1,273 +1,54 @@
 import { ref, computed, watch } from 'vue'; // computed, watch 추가
-import { convertKatecToWgs84 } from '@/utils/coordinateConverter';
 import { getDirections } from '@/api/kakaoMobility';
-// calculateHaversineDistance import 제거 (여기서는 불필요)
+import { fetchFuelInfo, fetchFuelPrices } from '@/api/fuelApi'; // Import from fuelApi
+import { getCachedData, cacheData } from '@/utils/cacheUtils'; // Import from cacheUtils
 const CACHE_KEY = 'fuelInfoData';
 const CACHE_DURATION = 60 * 60 * 1000; // 캐시 유효 기간: 1시간 (기본 정보)
 const PRICE_CACHE_KEY = 'fuelPriceData';
 const PRICE_CACHE_DURATION = 30 * 60 * 1000; // 가격 캐시 유효 기간: 30분
 
-// localStorage에서 캐시된 데이터 가져오기 (구조화된 데이터 반환하도록 수정)
-const getCachedFuelInfo = () => {
-  const cachedString = localStorage.getItem(CACHE_KEY);
-  if (!cachedString) {
-    console.log("Cache is empty.");
-    return null;
-  }
+// 기존 getCachedFuelInfo, cacheFuelInfo 함수 제거 (cacheUtils 사용)
 
-  try {
-    const parsedCache = JSON.parse(cachedString);
-    console.log("Parsed cache object:", parsedCache);
-    const { timestamp, data } = parsedCache;
+// 기존 parseAndTransformFuelData, fetchFuelInfo 함수 제거 (fuelApi 사용)
 
-    // 캐시 유효 기간 확인
-    if (Date.now() - timestamp < CACHE_DURATION) {
-      console.log("Cache is valid. Using cached structured data.");
-      // 캐시된 데이터는 이미 구조화된 형태라고 가정
-      return data;
-    } else {
-      console.log("Cached data expired.");
-      localStorage.removeItem(CACHE_KEY);
-      return null;
-    }
-  } catch (error) {
-    console.error("Failed to parse cached fuel info:", error);
-    localStorage.removeItem(CACHE_KEY);
-    return null;
-  }
-};
-
-// localStorage에 구조화된 데이터 저장
-const cacheFuelInfo = (structuredData) => {
-  try {
-    const cacheEntry = {
-      timestamp: Date.now(),
-      data: structuredData // 구조화된 데이터 저장
-    };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry));
-    console.log("Structured fuel info cached successfully.");
-  } catch (error) {
-    console.error("Failed to cache structured fuel info:", error);
-  }
-};
-
-// JSON 데이터를 파싱하고 좌표 변환하여 구조화된 배열로 반환
-const parseAndTransformFuelData = (jsonString) => {
-  if (!jsonString) {
-    // console.warn("parseAndTransformFuelData received empty or invalid input."); // 필요시 주석 해제
-    return [];
-  }
-
-  try {
-    const jsonData = JSON.parse(jsonString);
-    // console.log("JSON.parse() successful."); // 필요시 주석 해제
-
-    // API 응답 구조 확인 (result, info_cnt, info 배열)
-    if (jsonData.result !== 'success' || !Array.isArray(jsonData.info)) {
-      console.error("Invalid JSON data structure received from API:", jsonData);
-      return [];
-    }
-
-    const gasInfoItems = jsonData.info;
-    const structuredData = [];
-
-    // console.log(`Attempting to process ${gasInfoItems.length} gasInfo items from JSON.`); // 필요시 주석 해제
-
-    for (let i = 0; i < gasInfoItems.length; i++) {
-      const item = gasInfoItems[i];
-      const osnmValue = item.osnm || 'Unknown'; // 상호 (로그용)
-      // console.log(`Processing item ${i + 1}: ${osnmValue}`);
-
-      const katecXStr = item.gisxcoor;
-      const katecYStr = item.gisycoor;
-      // console.log(` - KATEC Coords (string): x=${katecXStr}, y=${katecYStr}`);
-
-      const katecX = parseFloat(katecXStr);
-      const katecY = parseFloat(katecYStr);
-      // console.log(` - KATEC Coords (float): x=${katecX}, y=${katecY}`);
-
-      if (isNaN(katecX) || isNaN(katecY)) {
-        // console.warn(` - Skipping item ${osnmValue} due to invalid KATEC coordinates.`); // 필요시 주석 해제
-        continue; // 다음 아이템으로 넘어감
-      }
-
-      // 좌표 변환
-      // console.log(` - Converting KATEC to WGS84...`);
-      const wgs84Coords = convertKatecToWgs84(katecX, katecY);
-      // console.log(` - WGS84 Coords result:`, wgs84Coords);
-
-      if (wgs84Coords) {
-        structuredData.push({
-          // JSON 데이터에서 직접 속성 접근
-          id: item.id, // ID 추가 (필요시)
-          poll: item.poll,
-          gpoll: item.gpoll,
-          osnm: item.osnm,
-          zip: item.zip,
-          adr: item.adr,
-          tel: item.tel,
-          lpgyn: item.lpgyn,
-          gisxcoor: katecX, // 원본 카텍 좌표도 유지
-          gisycoor: katecY,
-          lat: wgs84Coords.lat, // 변환된 위도
-          lng: wgs84Coords.lng, // 변환된 경도
-          // 추가된 가격 정보 (필요시 사용)
-          gasoline: item.gasoline,
-          premium_gasoline: item.premium_gasoline,
-          diesel: item.diesel,
-          lpg: item.lpg,
-        });
-      } else {
-        // console.warn(` - Skipping item ${osnmValue} due to coordinate conversion error or invalid result.`); // 필요시 주석 해제
-      }
-    }
-    // console.log("Finished processing. Parsed and transformed data count:", structuredData.length); // 필요시 주석 해제
-    return structuredData;
-  } catch (error) {
-    console.error("Failed to parse JSON or transform data:", error); // 에러 로그는 유지
-    // console.log("Original string that failed parsing:", jsonString); // 필요시 주석 해제
-    return [];
-  }
-};
-
-
-// 제주 주유소 정보 API 호출 함수 (구조화된 데이터 반환하도록 수정)
-const fetchFuelInfo = async () => {
-  const apiUrl = '/api/its/api/infoGasInfoList?code=860665'; // 이 URL이 JSON을 반환한다고 가정
-  // console.log(`Fetching fuel info (expecting JSON) via proxy: ${apiUrl}`); // 필요시 주석 해제
-  try {
-    // console.log("Inside fetchFuelInfo try block. Calling fetch..."); // 필요시 주석 해제
-    // fetch 요청 시 mode: 'cors' (기본값) 사용
-    const response = await fetch(apiUrl);
-    // console.log("Fetch call completed. Response status:", response.status, response.statusText); // 필요시 주석 해제
-
-    if (!response.ok) {
-      // console.error(`HTTP error! Status: ${response.status}`); // 에러 로그는 유지 (throw에서 처리)
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    // console.log("Response is OK (status 2xx). Proceeding to get text..."); // 필요시 주석 해제
-    const jsonText = await response.text();
-    // console.log("Raw API Response Text received in fetchFuelInfo:", jsonText); // 필요시 주석 해제
-
-    // JSON 파싱 및 좌표 변환 호출 전 로그
-    // console.log("Calling parseAndTransformFuelData with the received text..."); // 필요시 주석 해제
-    const structuredData = parseAndTransformFuelData(jsonText);
-    // console.log("St ", structuredData) // 사용자 추가 로그 제거
-
-    // 구조화된 데이터를 캐시에 저장
-    if (structuredData.length > 0) {
-      cacheFuelInfo(structuredData);
-    }
-
-    return structuredData; // 구조화된 데이터 반환
-
-  } catch (error) {
-    console.error("Failed to fetch or process fuel info:", error);
-    return []; // 오류 발생 시 빈 배열 반환
-  }
-};
-
-// 주유소 정보 로드 (캐시 우선, 구조화된 데이터 반환)
 const loadFuelInfo = async () => {
-  // console.log("Step 1: Loading Fuel Info..."); // 필요시 주석 해제
-  const cachedData = getCachedFuelInfo();
-  // console.log("Result of getCachedFuelInfo:", cachedData); // 필요시 주석 해제
+  const cachedData = getCachedData(CACHE_KEY, CACHE_DURATION); // Use imported cache function
   if (cachedData) {
-    // console.log("Cache hit. Returning cached data."); // 필요시 주석 해제
-    // console.log("Type of cached data being returned:", typeof cachedData, Array.isArray(cachedData) ? "(Array)" : ""); // 필요시 주석 해제
     return cachedData;
   } else {
-    // console.log("Cache miss or expired. Fetching from API..."); // 필요시 주석 해제
-    const fetchedData = await fetchFuelInfo(); // API 호출 (구조화된 데이터 반환)
-    if (fetchedData.length > 0) {
-      // console.log("Structured fuel info fetched from API."); // 필요시 주석 해제
-    } else {
-      // console.log("No fuel info fetched from API or parsing failed."); // 필요시 주석 해제
+    try {
+      const fetchedData = await fetchFuelInfo(); // Use imported API function
+      if (fetchedData && fetchedData.length > 0) {
+        cacheData(CACHE_KEY, fetchedData); // Use imported cache function
+      }
+      return fetchedData || []; // API 실패 시 빈 배열 반환 보장
+    } catch (error) {
+      console.error("Error in loadFuelInfo:", error);
+      return []; // 에러 발생 시 빈 배열 반환
     }
-    // console.log("Returning fetched data from API."); // 필요시 주석 해제
-    console.log("Type of fetched data being returned:", typeof fetchedData, Array.isArray(fetchedData) ? "(Array)" : ""); // 반환 타입 로깅
-    return fetchedData;
   }
 };
 
-// 유가 정보 API 호출 함수
-const fetchFuelPrices = async () => {
-  const apiUrl = '/api/its/api/infoGasPriceList?code=860665'; // 유가 정보 API URL
-  console.log(`Fetching fuel prices (expecting JSON) via proxy: ${apiUrl}`);
-  try {
-    const response = await fetch(apiUrl);
-    console.log("Price fetch call completed. Response status:", response.status, response.statusText);
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-    const jsonText = await response.text();
-    console.log("Raw Price API Response Text received:", jsonText);
-    const jsonData = JSON.parse(jsonText);
+// 기존 fetchFuelPrices 함수 제거 (fuelApi 사용)
 
-    if (jsonData.result !== 'success' || !Array.isArray(jsonData.info)) {
-      console.error("Invalid JSON data structure received from Price API:", jsonData);
-      return {}; // 빈 객체 반환
-    }
-
-    // 주유소 ID를 키로 하는 가격 정보 객체 생성
-    const priceMap = {};
-    jsonData.info.forEach(item => {
-      priceMap[item.id] = {
-        gasoline: item.gasoline,
-        premium_gasoline: item.premium_gasoline,
-        diesel: item.diesel,
-        lpg: item.lpg,
-      };
-    });
-    console.log("Fuel prices fetched and mapped by ID.");
-    return priceMap;
-
-  } catch (error) {
-    console.error("Failed to fetch or process fuel prices:", error);
-    return {}; // 오류 발생 시 빈 객체 반환
-  }
-};
-
-// 유가 정보 캐싱 관련 함수 (기존 로직 활용 또는 별도 구현)
-const getCachedFuelPrices = () => {
-  const cachedString = localStorage.getItem(PRICE_CACHE_KEY);
-  if (!cachedString) return null;
-  try {
-    const parsedCache = JSON.parse(cachedString);
-    if (Date.now() - parsedCache.timestamp < PRICE_CACHE_DURATION) {
-      console.log("Fuel prices loaded from cache.");
-      return parsedCache.data;
-    } else {
-      localStorage.removeItem(PRICE_CACHE_KEY);
-      return null;
-    }
-  } catch (error) {
-    localStorage.removeItem(PRICE_CACHE_KEY);
-    return null;
-  }
-};
-
-const cacheFuelPrices = (priceMap) => {
-  try {
-    const cacheEntry = { timestamp: Date.now(), data: priceMap };
-    localStorage.setItem(PRICE_CACHE_KEY, JSON.stringify(cacheEntry));
-    console.log("Fuel prices cached successfully.");
-  } catch (error) {
-    console.error("Failed to cache fuel prices:", error);
-  }
-};
+// 기존 getCachedFuelPrices, cacheFuelPrices 함수 제거 (cacheUtils 사용)
 
 // 유가 정보 로드 함수 (캐시 우선)
 const loadFuelPrices = async () => {
-  const cachedPrices = getCachedFuelPrices();
+  const cachedPrices = getCachedData(PRICE_CACHE_KEY, PRICE_CACHE_DURATION);
   if (cachedPrices) {
     return cachedPrices;
   } else {
-    const fetchedPrices = await fetchFuelPrices();
-    if (Object.keys(fetchedPrices).length > 0) {
-      cacheFuelPrices(fetchedPrices);
+    try {
+      const fetchedPrices = await fetchFuelPrices(); // Use imported API function
+      if (fetchedPrices && Object.keys(fetchedPrices).length > 0) {
+        cacheData(PRICE_CACHE_KEY, fetchedPrices); // Use imported cache function
+      }
+      return fetchedPrices || {}; // API 실패 시 빈 객체 반환 보장
+    } catch (error) {
+      console.error("Error in loadFuelPrices:", error);
+      return {}; // 에러 발생 시 빈 객체 반환
     }
-    return fetchedPrices;
   }
 };
 

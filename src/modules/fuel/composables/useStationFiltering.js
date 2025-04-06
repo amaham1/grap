@@ -16,6 +16,45 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
   // '더 보기' 버튼 표시 여부 (지도 내 주유소 기준)
   const canLoadMore = computed(() => stationsInBounds.value.length > visibleStations.value.length);
 
+  // --- Helper Functions ---
+
+  // 공통 필터링 로직 함수
+  const filterStations = (station) => {
+    const prices = fuelPrices.value[station.id];
+    const cityFilter = selectedCity.value === '전체' || (station.adr && station.adr.includes(selectedCity.value));
+    const price = prices ? prices[selectedFuelType.value] : undefined;
+    const hasValidPrice = typeof price === 'number' && price > 0;
+
+    // 좌표 정보가 없는 주유소 제외
+    if (!station.lat || !station.lng) return false;
+
+    if (selectedFuelType.value === 'lpg') {
+      return hasValidPrice && cityFilter && station.lpgyn === 'Y';
+    }
+    return hasValidPrice && cityFilter;
+  };
+
+  // 정렬 함수 (가격 우선, 거리 차선)
+  const sortStations = (a, b) => {
+    const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
+    const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
+
+    // 가격이 다르면 가격으로 정렬
+    if (priceA !== priceB) {
+      return priceA - priceB;
+    }
+
+    // 가격이 같으면 거리로 정렬 (userLocation이 있을 경우)
+    if (userLocation.value) {
+      const distA = typeof a.distance === 'number' ? a.distance : Infinity;
+      const distB = typeof b.distance === 'number' ? b.distance : Infinity;
+      return distA - distB;
+    }
+
+    return 0; // 사용자 위치 없으면 가격순 유지
+  };
+
+  // --- Computed Properties ---
   // 최저가 주유소 TOP 10을 가까운 순으로 정렬하여 계산하는 computed 속성
   const lowestPriceStations = computed(() => {
     // 의존성: fuelInfo, fuelPrices, selectedFuelType, selectedCity, userLocation
@@ -26,31 +65,14 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     console.log("[Filtering Computed] Calculating lowest price stations, sorted by distance...");
 
     // 1. 선택된 유종/도시 기준으로 모든 주유소 필터링
-    const allFilteredStations = fuelInfo.value.filter(station => {
-      const prices = fuelPrices.value[station.id];
-      const cityFilter = selectedCity.value === '전체' || (station.adr && station.adr.includes(selectedCity.value));
-      const price = prices ? prices[selectedFuelType.value] : undefined;
-      const hasValidPrice = typeof price === 'number' && price > 0;
-
-      // 좌표 정보가 없는 주유소 제외 (거리 계산 위해 필요)
-      if (!station.lat || !station.lng) return false;
-
-      if (selectedFuelType.value === 'lpg') {
-        return hasValidPrice && cityFilter && station.lpgyn === 'Y';
-      }
-      return hasValidPrice && cityFilter;
-    });
+    const allFilteredStations = fuelInfo.value.filter(filterStations); // Use helper function
 
     // 2. 가격순으로 정렬 (1차 기준)
+    // 가격순 정렬 (1차) - sortStations 사용 (거리 계산 전)
     allFilteredStations.sort((a, b) => {
-      const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
-      const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
-      // 가격이 다르면 가격으로 정렬
-      if (priceA !== priceB) {
+        const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
+        const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
         return priceA - priceB;
-      }
-      // 가격이 같으면 거리로 정렬 (2차 기준) - 거리 계산은 아래에서 수행
-      return 0; // 일단 0 반환, 거리 계산 후 다시 정렬
     });
 
     // 3. 상위 10개 추출 (최저가 TOP 10)
@@ -70,21 +92,8 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
         )
       }));
 
-      // 5. 가격이 같은 경우 거리순 (가까운 순)으로 다시 정렬 (2차 기준 적용)
-      top10WithDistance.sort((a, b) => {
-        const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
-        const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
-
-        // 가격이 다르면 가격순 정렬 결과 유지 (위에서 이미 정렬됨)
-        if (priceA !== priceB) {
-          return priceA - priceB;
-        }
-
-        // 가격이 같으면 거리로 정렬
-        const distA = typeof a.distance === 'number' ? a.distance : Infinity;
-        const distB = typeof b.distance === 'number' ? b.distance : Infinity;
-        return distA - distB;
-      });
+      // 5. 최종 정렬 (가격 우선, 거리 차선) - sortStations 사용
+      top10WithDistance.sort(sortStations);
     } else {
       // 사용자 위치 없으면 distance 속성 null로 설정 (정렬은 가격순 유지)
       console.log("[Filtering Computed] User location not available, skipping distance calculation and sorting.");
@@ -103,20 +112,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     }
     console.log("[Filtering Computed] Calculating all filtered stations (city, fuel type)...");
 
-    return fuelInfo.value.filter(station => {
-      const prices = fuelPrices.value[station.id];
-      const cityFilter = selectedCity.value === '전체' || (station.adr && station.adr.includes(selectedCity.value));
-      const price = prices ? prices[selectedFuelType.value] : undefined;
-      const hasValidPrice = typeof price === 'number' && price > 0;
-
-      // 좌표 정보가 없는 주유소 제외 (거리 계산 위해 필요)
-      if (!station.lat || !station.lng) return false;
-
-      if (selectedFuelType.value === 'lpg') {
-        return hasValidPrice && cityFilter && station.lpgyn === 'Y';
-      }
-      return hasValidPrice && cityFilter;
-    });
+    return fuelInfo.value.filter(filterStations); // Use helper function
   });
 
   // currentMinPrice도 computed로 정의
@@ -163,26 +159,15 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
 
     // 필터링된 전체 주유소 목록 계산 (지도 범위 필터링용)
     // lowestPriceStations computed와 유사하지만 정렬/slice 없음
-    const allFilteredStationsForBounds = fuelInfo.value.filter(station => {
-        const prices = fuelPrices.value[station.id];
-        const cityFilter = selectedCity.value === '전체' || (station.adr && station.adr.includes(selectedCity.value));
-        const price = prices ? prices[selectedFuelType.value] : undefined;
-        const hasValidPrice = typeof price === 'number' && price > 0;
-        if (selectedFuelType.value === 'lpg') {
-            return hasValidPrice && cityFilter && station.lpgyn === 'Y';
-        }
-        return hasValidPrice && cityFilter;
-    });
+    // 필터링된 전체 주유소 목록 사용 (filteredStations computed 활용)
+    const allFilteredStationsForBounds = filteredStations.value;
 
     // --- 2. 지도 범위 내 마커 업데이트 로직 (기존 로직 유지) ---
     console.log("[Filtering] Updating map markers based on current bounds...");
 
     // allFilteredStationsForBounds에서 지도 범위 내 주유소 찾기
-    stationsInBounds.value = allFilteredStationsForBounds.filter(station => {
-        if (!station.lat || !station.lng) return false;
-        const position = new window.kakao.maps.LatLng(station.lat, station.lng);
-        return bounds.contain(position);
-    });
+    // 지도 범위 필터링 함수 사용 (아래 정의)
+    stationsInBounds.value = filterStationsInBounds(allFilteredStationsForBounds, bounds);
     console.log(`[Filtering] Found ${stationsInBounds.value.length} stations within map bounds to display.`);
     // --- 지도 범위 내 마커 업데이트 로직 끝 ---
 
@@ -212,11 +197,21 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
   // stationsInBounds 변경 시 visibleStations 업데이트 (초기 로드 및 필터링 후)
   watch(stationsInBounds, updateVisibleStations);
 
+  // 지도 범위 내 주유소 필터링 함수
+  const filterStationsInBounds = (stations, bounds) => {
+    if (!bounds) return [];
+    return stations.filter(station => {
+      if (!station.lat || !station.lng) return false;
+      const position = new window.kakao.maps.LatLng(station.lat, station.lng);
+      return bounds.contain(position);
+    });
+  };
+
   return {
     stationsInBounds,
     lowestPriceStations,
     visibleStations, // 지도 표시용 최종 목록
-    filteredStations, // <<-- 새로 추가된 반환값 (전체 필터링 목록)
+    filteredStations, // 전체 필터링 목록
     visibleCount,
     isSearching, // 지도 검색 로딩 상태
     currentMinPrice, // 최저가 (마커 스타일링용)

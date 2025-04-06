@@ -26,7 +26,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import SidebarAds from '@/modules/components/ads/SidebarAds.vue'
+import SidebarAds from '@/components/ads/SidebarAds.vue' // 경로 수정
 
 const route = useRoute()
 
