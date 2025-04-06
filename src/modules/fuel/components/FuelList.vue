@@ -83,6 +83,8 @@ const mapInstance = ref(null);
 const userLocation = ref(null);
 const selectedFuelType = ref('gasoline');
 const selectedCity = ref('전체');
+const isSingleStationView = ref(false); // 단일 주유소 보기 모드 상태
+const selectedSingleStation = ref(null); // 단일 보기 시 선택된 주유소
 
 // --- 상수 정의 ---
 const fuelTypes = [ { text: '휘발유', value: 'gasoline' }, { text: '고급휘발유', value: 'premium_gasoline' }, { text: '경유', value: 'diesel' }, { text: 'LPG', value: 'lpg' }];
@@ -114,7 +116,7 @@ const {
   displayMarkers
 } = useMapDisplay(
     mapInstance,
-    stationsInBounds, // <<-- visibleStations 대신 stationsInBounds 전달
+    stationsInBounds,
     filteredStations,
     lowestPriceStations,
     fuelInfo,
@@ -122,7 +124,9 @@ const {
     selectedFuelType,
     ref(fuelTypes),
     userLocation,
-    isCalculatingDistances
+    isCalculatingDistances,
+    isSingleStationView, // <<-- 단일 보기 상태 전달
+    selectedSingleStation // <<-- 선택된 단일 주유소 전달
 );
 
 // --- 전체 로딩 상태 ---
@@ -159,6 +163,8 @@ onMounted(async () => {
     await getFuelData();
 
     // 데이터 로드 후 초기 목록 및 지도 마커 동시 업데이트
+    // isSingleStationView 상태 초기화 추가
+    isSingleStationView.value = false;
     await updateMapMarkersInBounds(true); // composable에서 반환된 이름 사용
     // 초기 거리 계산 로직은 watch에서 처리하도록 이동
   } catch (err) {
@@ -172,6 +178,7 @@ onMounted(async () => {
 // 필터 변경 시 목록/마커 업데이트 및 거리 재계산
 watch(selectedFuelType, async () => { // async 추가
   console.log(`Fuel type changed: ${selectedFuelType.value}. Updating list and map markers...`);
+  isSingleStationView.value = false; // 필터 변경 시 단일 보기 모드 해제
   await updateMapMarkersInBounds(); // 목록/마커 업데이트 기다림 (선택적)
   // 목록 업데이트 후 거리 재계산
   if (userLocation.value && lowestPriceStations.value.length > 0) {
@@ -182,6 +189,7 @@ watch(selectedFuelType, async () => { // async 추가
 
 watch(selectedCity, async () => { // async 추가
   console.log(`City filter changed: ${selectedCity.value}. Updating list and map markers...`);
+  isSingleStationView.value = false; // 필터 변경 시 단일 보기 모드 해제
   await updateMapMarkersInBounds(); // 목록/마커 업데이트 기다림 (선택적)
   // 목록 업데이트 후 거리 재계산
   if (userLocation.value && lowestPriceStations.value.length > 0) {
@@ -226,27 +234,17 @@ watch(isReadyForInitialCalc, (ready) => {
 
 // --- 컴포넌트 메소드 ---
 // 목록 항목 클릭 시 지도 이동 및 인포윈도우 열기
-const panToStation = async (station) => {
+const panToStation = (station) => {
   if (!mapInstance.value || !station.lat || !station.lng) return;
   const position = new window.kakao.maps.LatLng(station.lat, station.lng);
-  mapInstance.value.panTo(position);
 
-  // 현재 지도에 표시된 마커 중에서 찾기
-  const targetMarker = markers.value.find(m => m.getTitle() === station.osnm);
+  isSingleStationView.value = true; // 단일 보기 모드 활성화
+  selectedSingleStation.value = station; // 선택된 주유소 저장
 
-  // 마커가 현재 지도에 없다면 인포윈도우를 열지 않음
-  if (!targetMarker) {
-    console.log(`Marker for ${station.osnm} not found in the current marker list. Only panning the map.`);
-    return; // 인포윈도우 열기 로직 스킵
-  }
+  mapInstance.value.setCenter(position); // panTo 대신 setCenter 사용하여 즉시 이동
 
-  // 최종적으로 마커 찾아서 클릭 이벤트 트리거
-  if (targetMarker) {
-      console.log(`Triggering click event for marker: ${station.osnm}`);
-      window.kakao.maps.event.trigger(targetMarker, 'click');
-  } else {
-      console.warn("Marker still not found after reloading for station:", station.osnm);
-  }
+  // displayMarkers는 isSingleStationView/selectedSingleStation watch를 통해 호출됨
+  console.log(`Switched to single station view for: ${station.osnm}`);
 };
 
 // 최저가 목록 접기/펼치기 상태 (기본값 true로 변경)
@@ -254,9 +252,6 @@ const isLowestPriceListCollapsed = ref(true);
 const toggleLowestPriceList = () => {
   isLowestPriceListCollapsed.value = !isLowestPriceListCollapsed.value;
 };
-
-// 정렬 방향 관리 로직 제거 (항상 가까운 순)
-// 중복된 toggleLowestPriceList 함수 정의 제거
 
 // 표시할 최저가 주유소 목록 계산 (정렬 및 접힘 상태 반영)
 const displayedLowestStations = computed(() => {

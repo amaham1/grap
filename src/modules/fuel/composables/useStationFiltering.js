@@ -41,11 +41,16 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
       return hasValidPrice && cityFilter;
     });
 
-    // 2. 가격순으로 정렬
+    // 2. 가격순으로 정렬 (1차 기준)
     allFilteredStations.sort((a, b) => {
       const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
       const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
-      return priceA - priceB;
+      // 가격이 다르면 가격으로 정렬
+      if (priceA !== priceB) {
+        return priceA - priceB;
+      }
+      // 가격이 같으면 거리로 정렬 (2차 기준) - 거리 계산은 아래에서 수행
+      return 0; // 일단 0 반환, 거리 계산 후 다시 정렬
     });
 
     // 3. 상위 10개 추출 (최저가 TOP 10)
@@ -65,8 +70,17 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
         )
       }));
 
-      // 5. 거리순 (가까운 순)으로 다시 정렬
+      // 5. 가격이 같은 경우 거리순 (가까운 순)으로 다시 정렬 (2차 기준 적용)
       top10WithDistance.sort((a, b) => {
+        const priceA = fuelPrices.value[a.id]?.[selectedFuelType.value] ?? Infinity;
+        const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
+
+        // 가격이 다르면 가격순 정렬 결과 유지 (위에서 이미 정렬됨)
+        if (priceA !== priceB) {
+          return priceA - priceB;
+        }
+
+        // 가격이 같으면 거리로 정렬
         const distA = typeof a.distance === 'number' ? a.distance : Infinity;
         const distB = typeof b.distance === 'number' ? b.distance : Infinity;
         return distA - distB;
