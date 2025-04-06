@@ -26,7 +26,7 @@ export default defineConfig({
       '/api/its': {
         target: 'http://api.jejuits.go.kr',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/its/, '')
+        rewrite: (path) => path.replace(/^\/api\/its/, '') // '/api/its' 부분을 제거
       },
       // 카카오 API 프록시 설정
       '/api/kakao': {

@@ -19,12 +19,26 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
   // --- Helper Functions ---
 
   // 공통 필터링 로직 함수
+  let filterLogCount = 0; // 로그 출력 횟수 제한용 카운터
   const filterStations = (station) => {
     const prices = fuelPrices.value[station.id];
-    // '전체' 조건 제거: selectedCity 값이 '전체'가 아닌 실제 도시 이름일 때만 필터링
     const cityFilter = station.adr && station.adr.includes(selectedCity.value);
     const price = prices ? prices[selectedFuelType.value] : undefined;
     const hasValidPrice = typeof price === 'number' && price > 0;
+
+    // 처음 5개 주유소에 대해서만 상세 로그 출력
+    if (filterLogCount < 5) {
+      console.log(`[Filtering Helper] Station ID: ${station.id}, Name: ${station.osnm}`);
+      console.log(`  - Address: ${station.adr}`);
+      console.log(`  - Selected City: ${selectedCity.value}`);
+      console.log(`  - City Filter Result: ${cityFilter}`);
+      console.log(`  - Price for ${selectedFuelType.value}: ${price}`);
+      console.log(`  - Has Valid Price: ${hasValidPrice}`);
+      if (selectedFuelType.value === 'lpg') {
+        console.log(`  - LPG Y/N: ${station.lpgyn}`);
+      }
+      filterLogCount++;
+    }
 
     // 좌표 정보가 없는 주유소 제외
     if (!station.lat || !station.lng) return false;
@@ -72,15 +86,22 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
   // --- Computed Properties ---
   // 최저가 주유소 TOP 10을 가까운 순으로 정렬하여 계산하는 computed 속성
   const lowestPriceStations = computed(() => {
+    console.log("[Filtering Computed] lowestPriceStations calculation started."); // 계산 시작 로그
     // 의존성: fuelInfo, fuelPrices, selectedFuelType, selectedCity, userLocation
     if (!Array.isArray(fuelInfo.value) || fuelInfo.value.length === 0 || Object.keys(fuelPrices.value).length === 0) {
-      console.warn("[Filtering Computed] Data not ready for lowest price station list.");
+      console.warn("[Filtering Computed] Data not ready for lowest price station list. Returning empty array.");
       return [];
     }
+    console.log(`  - fuelInfo length: ${fuelInfo.value.length}`);
+    console.log(`  - fuelPrices keys length: ${Object.keys(fuelPrices.value).length}`);
+    console.log(`  - selectedFuelType: ${selectedFuelType.value}`);
+    console.log(`  - selectedCity: ${selectedCity.value}`);
     // console.log("[Filtering Computed] Calculating lowest price stations, sorted by distance...");
 
     // 1. 선택된 유종/도시 기준으로 모든 주유소 필터링
+    filterLogCount = 0; // 필터링 시작 전 로그 카운터 초기화
     const allFilteredStations = fuelInfo.value.filter(filterStations); // Use helper function
+    console.log(`[Filtering Computed] Step 1: Filtered by city/fuel type. Count: ${allFilteredStations.length}`); // 필터링 후 로그
 
     // 2. 가격순으로 정렬 (1차 기준)
     // 가격순 정렬 (1차) - sortStations 사용 (거리 계산 전)
@@ -89,9 +110,11 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
         const priceB = fuelPrices.value[b.id]?.[selectedFuelType.value] ?? Infinity;
         return priceA - priceB;
     });
+    // console.log("[Filtering Computed] Step 2: Sorted by price (primary)."); // 가격 정렬 후 로그 (선택적)
 
     // 3. 상위 10개 추출 (최저가 TOP 10)
     const top10LowestPrice = allFilteredStations.slice(0, 10);
+    console.log(`[Filtering Computed] Step 3: Sliced top 10. Count: ${top10LowestPrice.length}`); // Slice 후 로그
 
     // 4. 사용자 위치가 있으면 거리 계산 및 추가
     let top10WithDistance = top10LowestPrice;
@@ -109,6 +132,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
 
       // 5. 최종 정렬 (가격 우선, 거리 차선) - sortStations 사용
       top10WithDistance.sort(sortStations);
+      console.log("[Filtering Computed] Step 5: Sorted by distance (secondary)."); // 거리 정렬 후 로그
     } else {
       // 사용자 위치 없으면 distance 속성 null로 설정 (정렬은 가격순 유지)
       // console.log("[Filtering Computed] User location not available, skipping distance calculation and sorting.");
@@ -116,6 +140,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     }
 
     // console.log(`[Filtering Computed] Final list contains ${top10WithDistance.length} stations.`);
+    console.log(`[Filtering Computed] lowestPriceStations calculation finished. Returning ${top10WithDistance.length} stations.`); // 최종 결과 로그
     return top10WithDistance;
   });
 
