@@ -586,62 +586,74 @@ const searchInCurrentMap = () => {
 /* 모바일 반응형 스타일 */
 @media (max-width: 768px) {
   .fuel-type-selector {
-    position: relative; /* 절대 위치 해제 */
-    top: unset;
-    left: unset;
-    transform: none;
-    width: calc(100% - 20px); /* 좌우 여백 고려 */
-    margin: 10px auto; /* 상하좌우 여백 및 가운데 정렬 */
-    padding: 8px 10px;
-    flex-wrap: wrap; /* 줄바꿈 허용 */
-    justify-content: center; /* 가운데 정렬 */
-    gap: 10px; /* 내부 간격 조정 */
-    border-radius: 10px; /* 모서리 둥글기 조정 */
+    /* 상단 중앙 유지, 약간의 너비 조정 */
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 40px); /* 좌우 여백 확보 */
+    max-width: 350px; /* 최대 너비 제한 */
+    padding: 6px 10px; /* 패딩 약간 줄임 */
+    gap: 10px;
+    flex-wrap: wrap; /* 필요시 줄바꿈 */
+    justify-content: center;
   }
 
   .fuel-type-selector label {
-    margin: 0 5px; /* 좌우 마진 줄임 */
-    font-size: 13px; /* 폰트 크기 조정 */
+    margin: 0 5px;
+    font-size: 13px;
   }
 
   .city-selector {
-    position: relative;
-    top: unset;
-    left: unset;
-    width: calc(100% - 20px);
-    margin: 10px auto;
-    padding: 8px 10px;
-    justify-content: center;
-    gap: 15px; /* 도시 간 간격 조정 */
+    /* 유가 선택기 아래 중앙 */
+    position: absolute;
+    top: 60px; /* .fuel-type-selector 높이에 따라 조정 */
+    width: auto; /* 내용에 맞게 너비 조정 */
+    padding: 6px 10px;
+  }
+
+   .lowest-price-list {
+    /* 상단 좌측, 도시 선택기 아래 */
+    position: absolute;
+    top: 105px; /* .city-selector 높이에 따라 조정 */
+    left: 10px;
+    width: calc(100% - 240px); /* 좌우 여백 */
+    max-width: 280px; /* 최대 너비 제한 */
+    max-height: 200px; /* 높이 제한 조정 */
+    margin: 0; /* auto 마진 제거 */
   }
 
   .search-button-container {
-    position: relative;
-    top: unset;
-    left: unset;
-    width: 100%; /* 전체 너비 사용 */
-    text-align: center; /* 버튼 가운데 정렬 */
-    margin: 10px 0; /* 상하 여백 */
+    /* 하단 중앙 ('내 위치' 버튼 위) */
+    position: absolute;
+    top: 90%; /* '내 위치' 버튼 높이 + 여백 고려 */
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto; /* 버튼 크기에 맞춤 */
+    z-index: 11; /* 다른 요소 위에 오도록 */
   }
 
   .search-btn {
-    width: calc(100% - 40px); /* 버튼 너비 조정 */
-    max-width: 300px; /* 최대 너비 제한 */
+     /* 버튼 크기 조정 */
+     padding: 10px 20px;
+     font-size: 14px;
   }
 
-  .lowest-price-list {
-    position: relative;
-    top: unset;
-    left: unset;
-    width: calc(100% - 20px); /* 좌우 여백 고려 */
-    margin: 10px auto; /* 상하 여백 및 가운데 정렬 */
-    max-height: 250px; /* 모바일 높이 제한 */
+  .load-more-container {
+     /* 하단 중앙 ('현재 지도 검색' 버튼 위) */
+    position: absolute;
+    bottom: 120px; /* 검색 버튼 높이 + 여백 고려 */
+    left: 50%;
+    transform: translateX(-50%);
+    width: auto;
+    z-index: 11;
   }
 
   .current-location-btn {
-    bottom: 20px; /* 하단 여백 조정 */
-    right: 15px; /* 우측 여백 조정 */
-    width: 35px; /* 버튼 크기 약간 줄임 */
+    /* 하단 우측 유지, 여백 조정 */
+    bottom: 20px;
+    right: 15px;
+    width: 35px;
     height: 35px;
   }
   .current-location-btn img {
@@ -649,14 +661,32 @@ const searchInCurrentMap = () => {
       height: 18px;
   }
 
-  .load-more-container {
-    position: relative;
-    bottom: unset;
-    left: unset;
-    transform: none;
-    width: 100%;
-    text-align: center;
-    margin: 15px 0; /* 상하 여백 */
+  /* 모바일: 최저가 목록 헤더 레이아웃 조정 */
+  .list-header {
+    flex-direction: column; /* 세로 배치 */
+    align-items: flex-start; /* 왼쪽 정렬 */
+    padding-bottom: 5px; /* 하단 패딩 조정 */
+  }
+
+  .toggle-list-btn {
+    margin-top: 5px; /* 제목 아래 간격 */
+    padding: 2px 5px; /* 패딩 조정 */
+    align-self: flex-end; /* 오른쪽 끝으로 이동 */
+  }
+
+  /* 모바일: 최저가 목록 아이템 레이아웃 조정 */
+  .station-info {
+    flex-direction: column; /* 세로 배치 */
+    align-items: flex-start; /* 왼쪽 정렬 */
+  }
+
+  .price {
+    margin-top: 3px; /* 주유소 이름 아래 간격 */
+    font-size: 14px; /* 가격 폰트 약간 키움 */
+  }
+
+  .station-distance {
+      margin-top: 2px; /* 가격 아래 간격 */
   }
 }
 
