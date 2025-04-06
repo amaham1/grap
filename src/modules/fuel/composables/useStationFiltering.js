@@ -62,7 +62,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
       console.warn("[Filtering Computed] Data not ready for lowest price station list.");
       return [];
     }
-    console.log("[Filtering Computed] Calculating lowest price stations, sorted by distance...");
+    // console.log("[Filtering Computed] Calculating lowest price stations, sorted by distance...");
 
     // 1. 선택된 유종/도시 기준으로 모든 주유소 필터링
     const allFilteredStations = fuelInfo.value.filter(filterStations); // Use helper function
@@ -81,7 +81,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     // 4. 사용자 위치가 있으면 거리 계산 및 추가
     let top10WithDistance = top10LowestPrice;
     if (userLocation.value && userLocation.value.lat && userLocation.value.lng) {
-      console.log("[Filtering Computed] Calculating distances for top 10 lowest price stations.");
+      // console.log("[Filtering Computed] Calculating distances for top 10 lowest price stations.");
       top10WithDistance = top10LowestPrice.map(station => ({
         ...station,
         distance: calculateDistance(
@@ -96,11 +96,11 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
       top10WithDistance.sort(sortStations);
     } else {
       // 사용자 위치 없으면 distance 속성 null로 설정 (정렬은 가격순 유지)
-      console.log("[Filtering Computed] User location not available, skipping distance calculation and sorting.");
+      // console.log("[Filtering Computed] User location not available, skipping distance calculation and sorting.");
       top10WithDistance = top10LowestPrice.map(station => ({ ...station, distance: null }));
     }
 
-    console.log(`[Filtering Computed] Final list contains ${top10WithDistance.length} stations.`);
+    // console.log(`[Filtering Computed] Final list contains ${top10WithDistance.length} stations.`);
     return top10WithDistance;
   });
 
@@ -110,7 +110,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     if (!Array.isArray(fuelInfo.value) || fuelInfo.value.length === 0 || Object.keys(fuelPrices.value).length === 0) {
       return [];
     }
-    console.log("[Filtering Computed] Calculating all filtered stations (city, fuel type)...");
+    // console.log("[Filtering Computed] Calculating all filtered stations (city, fuel type)...");
 
     return fuelInfo.value.filter(filterStations); // Use helper function
   });
@@ -142,7 +142,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     if (!isInitialLoad) {
         isSearching.value = true;
     }
-    console.log("[Filtering] Updating map markers based on current bounds and filters...");
+    // console.log("[Filtering] Updating map markers based on current bounds and filters...");
 
     await nextTick();
     let bounds;
@@ -163,12 +163,12 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
     const allFilteredStationsForBounds = filteredStations.value;
 
     // --- 2. 지도 범위 내 마커 업데이트 로직 (기존 로직 유지) ---
-    console.log("[Filtering] Updating map markers based on current bounds...");
+    // console.log("[Filtering] Updating map markers based on current bounds...");
 
     // allFilteredStationsForBounds에서 지도 범위 내 주유소 찾기
     // 지도 범위 필터링 함수 사용 (아래 정의)
     stationsInBounds.value = filterStationsInBounds(allFilteredStationsForBounds, bounds);
-    console.log(`[Filtering] Found ${stationsInBounds.value.length} stations within map bounds to display.`);
+    // console.log(`[Filtering] Found ${stationsInBounds.value.length} stations within map bounds to display.`);
     // --- 지도 범위 내 마커 업데이트 로직 끝 ---
 
     // 지도에 표시할 마커 업데이트
@@ -184,7 +184,7 @@ export function useStationFiltering(fuelInfo, fuelPrices, selectedFuelType, sele
   const updateVisibleStations = () => {
     // stationsInBounds가 변경되면 visibleStations 업데이트
     visibleStations.value = stationsInBounds.value.slice(0, visibleCount.value);
-    console.log(`[Filtering] Updating visible stations state: ${visibleStations.value.length}`);
+    // console.log(`[Filtering] Updating visible stations state: ${visibleStations.value.length}`);
     // 실제 마커 표시는 useMapDisplay에서 visibleStations를 watch하여 처리
   };
 

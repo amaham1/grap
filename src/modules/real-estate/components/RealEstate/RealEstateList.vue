@@ -280,7 +280,7 @@ const fetchRealEstates = async () => {
 };
 
 const handlePageChange = (page) => {
-  console.log('Page change requested:', page);
+  // console.log('Page change requested:', page);
   if (page >= 0 && page < totalPages.value) {
     currentPage.value = page;
     fetchRealEstates();

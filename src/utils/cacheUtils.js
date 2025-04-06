@@ -7,7 +7,7 @@
 export const getCachedData = (key, duration) => {
   const cachedString = localStorage.getItem(key);
   if (!cachedString) {
-    console.log(`Cache [${key}] is empty.`);
+    // console.log(`Cache [${key}] is empty.`);
     return null;
   }
 
@@ -16,10 +16,10 @@ export const getCachedData = (key, duration) => {
     const { timestamp, data } = parsedCache;
 
     if (Date.now() - timestamp < duration) {
-      console.log(`Cache [${key}] is valid. Using cached data.`);
+      // console.log(`Cache [${key}] is valid. Using cached data.`);
       return data;
     } else {
-      console.log(`Cache [${key}] expired.`);
+      // console.log(`Cache [${key}] expired.`);
       localStorage.removeItem(key);
       return null;
     }
@@ -42,7 +42,7 @@ export const cacheData = (key, data) => {
       data: data
     };
     localStorage.setItem(key, JSON.stringify(cacheEntry));
-    console.log(`Data cached successfully for key [${key}].`);
+    // console.log(`Data cached successfully for key [${key}].`);
   } catch (error) {
     console.error(`Failed to cache data for key [${key}]:`, error);
   }

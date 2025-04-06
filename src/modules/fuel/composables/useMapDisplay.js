@@ -85,7 +85,7 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
     // --- 단일 주유소 보기 모드 처리 --- (기존과 동일)
     if (isSingleStationView.value && selectedSingleStation.value) {
       const station = selectedSingleStation.value;
-      console.log(`Displaying single marker for: ${station.osnm}`);
+      // console.log(`Displaying single marker for: ${station.osnm}`);
 
       if (!station || !station.lat || !station.lng) {
         console.warn("Invalid station data for single view.");
@@ -108,12 +108,12 @@ export function useMapDisplay(mapInstance, visibleStations, allFilteredStations,
     // --- 일반 지도 보기 모드 처리 ---
     } else {
       if (!Array.isArray(visibleStations.value) || visibleStations.value.length === 0) { // Check visibleStations
-        console.log("No stations to display in the current map view.");
+        // console.log("No stations to display in the current map view.");
         markers.value = [];
         infowindows.value = [];
         return;
       }
-      console.log(`Displaying ${visibleStations.value.length} markers in the current map view.`); // Log uses visibleStations
+      // console.log(`Displaying ${visibleStations.value.length} markers in the current map view.`); // Log uses visibleStations
 
       // 최저가 계산 로직 제거 (currentMinPrice 사용)
       const hasValidLowestPrice = currentMinPrice.value !== Infinity;

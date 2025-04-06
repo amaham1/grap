@@ -165,7 +165,7 @@ export const realEstateApi = {
 
       const queryParams = new URLSearchParams(validParams);
 
-      console.log('API 요청 파라미터:', Object.fromEntries(queryParams.entries()));
+      // console.log('API 요청 파라미터:', Object.fromEntries(queryParams.entries()));
 
       const response = await fetch(`${BASE_URL}/real-estate/all?${queryParams}`);
       
@@ -220,16 +220,16 @@ export const realEstateApi = {
   async fetchTopDealsByAmount(dealDate) {
     try {
       const url = new URL(`${BASE_URL}/real-estate/top-monthly-real-estate`);
-      console.log(url)
+      // console.log(url)
       url.searchParams.append('dealDate', dealDate); // YYYY-MM 형식
       
       const response = await fetch(url);
-      console.log('[DEBUG] API Request:', url.toString());
+      // console.log('[DEBUG] API Request:', url.toString());
       
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       
       const data = await response.json();
-      console.log('[DEBUG] API Response:', data);
+      // console.log('[DEBUG] API Response:', data);
       return data;
     } catch (error) {
       console.error('[ERROR] Failed to fetch top deals:', error);
@@ -273,7 +273,7 @@ export const realEstateApi = {
       params.append('itemSizePerPage', itemSizePerPage.toString());
 
       url.search = params.toString();
-      console.log('시세 데이터 요청 URL:', url.toString());
+      // console.log('시세 데이터 요청 URL:', url.toString());
 
       const response = await fetch(url, {
         method: 'GET',
@@ -293,7 +293,7 @@ export const realEstateApi = {
       }
 
       const data = await response.json();
-      console.log('시세 데이터 응답:', data);
+      // console.log('시세 데이터 응답:', data);
 
       return data;
     } catch (error) {

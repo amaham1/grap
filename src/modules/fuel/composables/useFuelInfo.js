@@ -73,11 +73,11 @@ export function useFuelInfo() {
         loadFuelPrices()
       ]);
 
-      console.log("Data received from loadFuelInfo:", infoData);
+      // console.log("Data received from loadFuelInfo:", infoData);
       // 초기 distance 상태 설정 (undefined)
       fuelInfo.value = infoData.map(station => ({ ...station, distance: undefined }));
 
-      console.log("Data received from loadFuelPrices:", priceData);
+      // console.log("Data received from loadFuelPrices:", priceData);
       fuelPrices.value = priceData;
 
     } catch (err) {
@@ -94,13 +94,13 @@ export function useFuelInfo() {
   // 거리 계산 함수 수정 (최저가 주유소 목록과 현재 위치를 인자로 받음)
   const calculateDistances = async (stationsToCalculate, currentLocation) => {
     if (!currentLocation || !Array.isArray(stationsToCalculate) || stationsToCalculate.length === 0) {
-      console.log("Cannot calculate distances: Missing current location or stations to calculate.");
+      // console.log("Cannot calculate distances: Missing current location or stations to calculate.");
       // 이미 distance가 undefined인 상태이므로 별도 초기화 불필요
       return;
     }
 
     isCalculatingDistances.value = true;
-    console.log(`Starting distance calculation for ${stationsToCalculate.length} stations from:`, currentLocation);
+    // console.log(`Starting distance calculation for ${stationsToCalculate.length} stations from:`, currentLocation);
     error.value = null; // 거리 계산 에러 초기화
 
     try {
@@ -118,7 +118,7 @@ export function useFuelInfo() {
       });
 
       const distanceResults = await Promise.all(distancePromises);
-      console.log("Distance calculation API results:", distanceResults); // API 결과 로그 추가
+      // console.log("Distance calculation API results:", distanceResults); // API 결과 로그 추가
 
       // 결과를 fuelInfo ref에 업데이트
       const updatedFuelInfo = fuelInfo.value.map(station => {
@@ -130,11 +130,11 @@ export function useFuelInfo() {
         return station; // 변경 없는 경우 기존 객체 반환
       });
       // 업데이트될 데이터 로그 추가 (거리 계산 대상만 필터링)
-      console.log("Updated fuelInfo data with distances (before assigning):", JSON.parse(JSON.stringify(updatedFuelInfo.filter(s => stationsToCalculate.some(stc => stc.id === s.id)))));
+      // console.log("Updated fuelInfo data with distances (before assigning):", JSON.parse(JSON.stringify(updatedFuelInfo.filter(s => stationsToCalculate.some(stc => stc.id === s.id)))));
 
       fuelInfo.value = updatedFuelInfo; // 반응형 업데이트
-      console.log("Assigned updated fuelInfo to ref."); // 할당 완료 로그
-      console.log("Distance calculation complete for specified stations.");
+      // console.log("Assigned updated fuelInfo to ref."); // 할당 완료 로그
+      // console.log("Distance calculation complete for specified stations.");
 
     } catch (err) {
       console.error("Error calculating distances:", err);

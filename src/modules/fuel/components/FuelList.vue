@@ -60,7 +60,7 @@
       <div id="map" :class="{ 'map-hidden': isLoading || error }"></div>
       <!-- 내 위치로 이동 버튼 -->
       <button @click="moveToCurrentLocation" class="current-location-btn" title="내 위치로 이동">
-        <i class="fas fa-location-crosshairs"></i> <!-- Font Awesome 아이콘으로 변경 -->
+        <img src="@/assets/images/icon/my-location.png" alt="내 위치" style="width: 20px; height: 20px;">
       </button>
     </div>
   </div>
@@ -184,23 +184,23 @@ onMounted(async () => {
 // --- Watchers ---
 // 필터 변경 시 목록/마커 업데이트 및 거리 재계산
 watch(selectedFuelType, async () => { // async 추가
-  console.log(`Fuel type changed: ${selectedFuelType.value}. Updating list and map markers...`);
+  // console.log(`Fuel type changed: ${selectedFuelType.value}. Updating list and map markers...`);
   isSingleStationView.value = false; // 필터 변경 시 단일 보기 모드 해제
   await updateMapMarkersInBounds(); // 목록/마커 업데이트 기다림 (선택적)
   // 목록 업데이트 후 거리 재계산
   if (userLocation.value && lowestPriceStations.value.length > 0) {
-    console.log("Fuel type changed: Recalculating distances for new TOP 10.");
+    // console.log("Fuel type changed: Recalculating distances for new TOP 10.");
     calculateDistances(lowestPriceStations.value, userLocation.value);
   }
 });
 
 watch(selectedCity, async () => { // async 추가
-  console.log(`City filter changed: ${selectedCity.value}. Updating list and map markers...`);
+  // console.log(`City filter changed: ${selectedCity.value}. Updating list and map markers...`);
   isSingleStationView.value = false; // 필터 변경 시 단일 보기 모드 해제
   await updateMapMarkersInBounds(); // 목록/마커 업데이트 기다림 (선택적)
   // 목록 업데이트 후 거리 재계산
   if (userLocation.value && lowestPriceStations.value.length > 0) {
-    console.log("City filter changed: Recalculating distances for new TOP 10.");
+    // console.log("City filter changed: Recalculating distances for new TOP 10.");
     calculateDistances(lowestPriceStations.value, userLocation.value);
   }
 });
@@ -212,13 +212,13 @@ watch(userLocation, (newLocation, oldLocation) => {
     const isInitialLoad = !oldLocation; // 초기 로드 여부 확인
     const logPrefix = isInitialLoad ? "Initial location loaded" : "User location changed";
 
-    console.log(`${logPrefix}. Checking conditions to calculate distances for TOP 10.`);
+    // console.log(`${logPrefix}. Checking conditions to calculate distances for TOP 10.`);
     // 최저가 목록이 준비되었는지 확인 후 거리 계산 호출
     if (lowestPriceStations.value && lowestPriceStations.value.length > 0) {
-      console.log(`${logPrefix}: Lowest stations ready. Calculating distances.`);
+      // console.log(`${logPrefix}: Lowest stations ready. Calculating distances.`);
       calculateDistances(lowestPriceStations.value, newLocation);
     } else {
-      console.log(`${logPrefix}: Lowest stations not ready yet. Distance calculation deferred.`);
+      // console.log(`${logPrefix}: Lowest stations not ready yet. Distance calculation deferred.`);
       // lowestPriceStations가 나중에 준비되면 필터 watch에서 처리될 수 있음
       // 또는, lowestPriceStations를 여기서 watch하는 로직을 추가할 수도 있지만,
       // 현재 구조에서는 필터 watch가 그 역할을 할 것으로 기대됨.
@@ -231,7 +231,7 @@ watch(userLocation, (newLocation, oldLocation) => {
 // 초기 로드 시 거리 계산 트리거 (조건 충족 시 단 한번 실행)
 watch(isReadyForInitialCalc, (ready) => {
   if (ready) {
-    console.log("Conditions met for initial distance calculation.");
+    // console.log("Conditions met for initial distance calculation.");
     calculateDistances(lowestPriceStations.value, userLocation.value);
     initialCalcDone.value = true; // 초기 계산 완료 표시
   }
@@ -251,7 +251,7 @@ const panToStation = (station) => {
   mapInstance.value.setCenter(position); // panTo 대신 setCenter 사용하여 즉시 이동
 
   // displayMarkers는 isSingleStationView/selectedSingleStation watch를 통해 호출됨
-  console.log(`Switched to single station view for: ${station.osnm}`);
+  // console.log(`Switched to single station view for: ${station.osnm}`);
 };
 
 // 최저가 목록 접기/펼치기 상태 (기본값 true로 변경)
@@ -286,7 +286,7 @@ const moveToCurrentLocation = async () => {
     mapInstance.value.panTo(currentLatLng);
     // userLocation.value 업데이트는 선택 사항 (이미 onMounted에서 처리)
     // 필요 시 현재 위치 마커 업데이트 로직 추가
-    console.log("Moved map to current location:", currentLatLng);
+    // console.log("Moved map to current location:", currentLatLng);
   } catch (error) {
     console.error("Error getting current location:", error);
     alert(`현재 위치를 가져오는 데 실패했습니다: ${error.message}`);
@@ -299,7 +299,7 @@ const searchInCurrentMap = () => {
     isSingleStationView.value = false; // 단일 보기 모드 해제
     // 상태 변경 후 마커 업데이트가 watch에서 처리될 때까지 잠시 기다릴 수 있음
     // 하지만 updateMapMarkersInBounds가 stationsInBounds를 변경하므로 watch가 트리거됨
-    console.log("Exited single station view by searching in map.");
+    // console.log("Exited single station view by searching in map.");
   }
   updateMapMarkersInBounds(); // 기존 검색 로직 호출
 }; // <<-- 올바른 닫는 중괄호와 세미콜론
