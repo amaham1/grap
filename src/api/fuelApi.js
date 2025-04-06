@@ -67,14 +67,11 @@ export const fetchFuelInfo = async () => {
     : `${import.meta.env.VITE_FUEL_API_BASE_URL || 'http://api.jejuits.go.kr'}/api/infoGasInfoList?code=${apiCode}`;
 
   try {
-    console.log("Fetching fuel info from:", apiUrl); // API URL 로그 출력
     const response = await fetch(apiUrl);
-    console.log("Fuel info response status:", response.status, response.ok); // 응답 상태 로그 출력
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const jsonText = await response.text();
-    console.log("Raw fuel info response text:", jsonText); // 원본 응답 텍스트 로그 출력
     const structuredData = parseAndTransformFuelData(jsonText);
     return structuredData;
   } catch (error) {
@@ -92,14 +89,11 @@ export const fetchFuelPrices = async () => {
     : `${import.meta.env.VITE_FUEL_API_BASE_URL || 'http://api.jejuits.go.kr'}/api/infoGasPriceList?code=${apiCode}`; // Corrected endpoint: infoGasPriceList
 
   try {
-    console.log("Fetching fuel prices from:", apiUrl); // API URL 로그 출력
     const response = await fetch(apiUrl);
-    console.log("Fuel prices response status:", response.status, response.ok); // 응답 상태 로그 출력
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     const jsonText = await response.text();
-    console.log("Raw fuel prices response text:", jsonText); // 원본 응답 텍스트 로그 출력
     const jsonData = JSON.parse(jsonText);
 
     if (jsonData.result !== 'success' || !Array.isArray(jsonData.info)) {
@@ -110,9 +104,6 @@ export const fetchFuelPrices = async () => {
     // 주유소 ID를 키로 하는 가격 정보 객체 생성
     const priceMap = {};
     // Log the first item from the price API response to check structure
-    if (jsonData.info.length > 0) {
-      console.log("[API Price Data] First item structure:", JSON.stringify(jsonData.info[0]));
-    }
     jsonData.info.forEach(item => {
       priceMap[item.id] = {
         gasoline: item.gasoline,
