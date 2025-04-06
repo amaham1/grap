@@ -586,17 +586,17 @@ const searchInCurrentMap = () => {
 /* 모바일 반응형 스타일 */
 @media (max-width: 768px) {
   .fuel-type-selector {
-    /* 상단 중앙 유지, 약간의 너비 조정 */
+    /* 상단 좌측 정렬, 너비 조정 */
     position: absolute;
     top: 10px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 40px); /* 좌우 여백 확보 */
-    max-width: 350px; /* 최대 너비 제한 */
-    padding: 6px 10px; /* 패딩 약간 줄임 */
+    left: 10px; /* 좌측 정렬 */
+    transform: none; /* transform 제거 */
+    width: calc(100% - 20px); /* 좌우 여백 10px */
+    max-width: 400px; /* 최대 너비 약간 증가 */
+    padding: 8px 12px; /* 패딩 조정 */
     gap: 10px;
-    flex-wrap: wrap; /* 필요시 줄바꿈 */
-    justify-content: center;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* 좌측부터 배치 */
   }
 
   .fuel-type-selector label {
@@ -605,32 +605,34 @@ const searchInCurrentMap = () => {
   }
 
   .city-selector {
-    /* 유가 선택기 아래 중앙 */
+    /* 유가 선택기 아래 좌측 */
     position: absolute;
-    top: 60px; /* .fuel-type-selector 높이에 따라 조정 */
-    width: auto; /* 내용에 맞게 너비 조정 */
+    top: 75px; /* 상단 간격 조정 (fuel-type-selector 높이 고려) */
+    left: 10px; /* 좌측 정렬 */
+    width: auto;
     padding: 6px 10px;
   }
 
    .lowest-price-list {
-    /* 상단 좌측, 도시 선택기 아래 */
+    /* 도시 선택기 아래 좌측 */
     position: absolute;
-    top: 105px; /* .city-selector 높이에 따라 조정 */
+    top: 115px; /* city-selector 아래 간격 조정 */
     left: 10px;
-    width: calc(100% - 240px); /* 좌우 여백 */
-    max-width: 280px; /* 최대 너비 제한 */
-    max-height: 200px; /* 높이 제한 조정 */
-    margin: 0; /* auto 마진 제거 */
+    width: calc(100% - 240px); /* 화면 너비에 맞게 조정 (좌우 여백 10px) */
+    max-width: 300px; /* 최대 너비 약간 증가 */
+    max-height: 250px; /* 높이 제한 약간 증가 */
+    margin: 0;
   }
 
   .search-button-container {
-    /* 하단 중앙 ('내 위치' 버튼 위) */
+    /* 화면 하단 중앙 */
     position: absolute;
-    top: 90%; /* '내 위치' 버튼 높이 + 여백 고려 */
+    top: auto; /* top 속성 제거 */
+    bottom: 20px; /* 화면 하단에 배치 */
     left: 50%;
     transform: translateX(-50%);
-    width: auto; /* 버튼 크기에 맞춤 */
-    z-index: 11; /* 다른 요소 위에 오도록 */
+    width: auto;
+    z-index: 11;
   }
 
   .search-btn {
@@ -642,7 +644,7 @@ const searchInCurrentMap = () => {
   .load-more-container {
      /* 하단 중앙 ('현재 지도 검색' 버튼 위) */
     position: absolute;
-    bottom: 120px; /* 검색 버튼 높이 + 여백 고려 */
+    bottom: 70px; /* search-button-container 위로 조정 */
     left: 50%;
     transform: translateX(-50%);
     width: auto;

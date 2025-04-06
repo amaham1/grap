@@ -119,7 +119,7 @@ a:hover {
 }
 
 .container {
-  width: 100%;
+  width: 100%; /* 화면 너비에 맞게 조절되도록 추가 */
   max-width: var(--container-width);
   margin: 0 auto;
   padding: 0 var(--spacing-4);
