@@ -6,7 +6,6 @@
         <h1 class="hero-title">Grap에 오신 것을 환영합니다</h1>
         <p class="hero-subtitle">여러분의 생활을 편리하게 만드는 통합 정보 서비스</p>
         <div class="hero-actions">
-          <router-link to="/real-estate" class="btn btn-primary">부동산 서비스 시작하기</router-link>
           <router-link to="/fuel" class="btn btn-outline">주유소 서비스 시작하기</router-link>
         </div>
       </div>
@@ -16,12 +15,6 @@
       <div class="container">
         <h2 class="section-title">제공 서비스</h2>
         <div class="services-grid">
-          <div class="service-card">
-            <div class="service-icon">🏠</div>
-            <h3>부동산 정보</h3>
-            <p>부동산 정보를 간편하게 검색하고 비교해보세요.</p>
-            <router-link to="/real-estate" class="service-link">자세히 보기 →</router-link>
-          </div>
           <div class="service-card">
             <div class="service-icon">🛢️</div>
             <h3>주유소 정보</h3>

@@ -93,6 +93,7 @@ const {
   stationsInBounds,
   lowestPriceStations,
   visibleStations,
+  filteredStations, // <<-- 새로 추가된 반환값 받기
   isSearching,
   canLoadMore,
   updateMapMarkersInBounds, // composable에서 반환된 이름 사용
@@ -113,7 +114,8 @@ const {
   displayMarkers
 } = useMapDisplay(
     mapInstance,
-    visibleStations,
+    stationsInBounds, // <<-- visibleStations 대신 stationsInBounds 전달
+    filteredStations,
     lowestPriceStations,
     fuelInfo,
     fuelPrices,
@@ -229,15 +231,13 @@ const panToStation = async (station) => {
   const position = new window.kakao.maps.LatLng(station.lat, station.lng);
   mapInstance.value.panTo(position);
 
-  let targetMarker = markers.value.find(m => m.getTitle() === station.osnm);
+  // 현재 지도에 표시된 마커 중에서 찾기
+  const targetMarker = markers.value.find(m => m.getTitle() === station.osnm);
 
-  // 마커가 현재 지도에 없다면, 해당 위치 기준으로 마커 로드 시도
+  // 마커가 현재 지도에 없다면 인포윈도우를 열지 않음
   if (!targetMarker) {
-    console.log(`Marker for ${station.osnm} not found in current view. Reloading markers...`);
-    await updateMapMarkersInBounds(false); // composable에서 반환된 이름 사용
-    // 마커 로드 후 다시 찾기 (displayMarkers가 비동기적으로 완료될 수 있으므로 약간의 지연 고려)
-    await new Promise(resolve => setTimeout(resolve, 100));
-    targetMarker = markers.value.find(m => m.getTitle() === station.osnm);
+    console.log(`Marker for ${station.osnm} not found in the current marker list. Only panning the map.`);
+    return; // 인포윈도우 열기 로직 스킵
   }
 
   // 최종적으로 마커 찾아서 클릭 이벤트 트리거

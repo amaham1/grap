@@ -1,7 +1,7 @@
 // src/modules/fuel/composables/useMapDisplay.js
 import { ref, reactive, watch } from 'vue';
 
-export function useMapDisplay(mapInstance, visibleStations, lowestPriceStations, fuelInfo, fuelPrices, selectedFuelType, fuelTypes, userLocation, isCalculatingDistances) { // fuelInfo 인자 추가
+export function useMapDisplay(mapInstance, stationsInBounds, allFilteredStations, lowestPriceStations, fuelInfo, fuelPrices, selectedFuelType, fuelTypes, userLocation, isCalculatingDistances) { // visibleStations -> stationsInBounds
   const markers = ref([]);
   const infowindows = ref([]);
   const openInfowindow = reactive({}); // 현재 열려있는 인포윈도우 추적
@@ -45,15 +45,36 @@ export function useMapDisplay(mapInstance, visibleStations, lowestPriceStations,
     markers.value = [];
     Object.keys(openInfowindow).forEach(key => delete openInfowindow[key]); // 열린 인포윈도우 상태 초기화
 
-    if (!Array.isArray(visibleStations.value) || visibleStations.value.length === 0) {
+    if (!Array.isArray(stationsInBounds.value) || stationsInBounds.value.length === 0) { // visibleStations -> stationsInBounds
       console.log("No stations to display in the current map view.");
       return;
     }
-    console.log(`Displaying ${visibleStations.value.length} markers in the current map view.`);
+    console.log(`Displaying ${stationsInBounds.value.length} markers in the current map view.`); // visibleStations -> stationsInBounds
 
     const newMarkers = [];
     const newInfowindows = [];
-    const lowestPriceStationIds = new Set(lowestPriceStations.value.map(s => s.id));
+    // 실제 최저 가격 계산 (전체 필터링된 주유소 기준)
+    let actualLowestPrice = Infinity;
+    if (allFilteredStations && Array.isArray(allFilteredStations.value)) {
+      allFilteredStations.value.forEach(station => {
+        const prices = fuelPrices.value[station.id];
+        if (prices && prices[selectedFuelType.value] > 0) {
+          actualLowestPrice = Math.min(actualLowestPrice, prices[selectedFuelType.value]);
+        }
+      });
+    } else {
+      console.warn("allFilteredStations is not available for lowest price calculation.");
+      // allFilteredStations가 없으면 visibleStations 기준으로 계산 (폴백)
+      // allFilteredStations가 없으면 stationsInBounds 기준으로 계산 (폴백)
+      stationsInBounds.value.forEach(station => { // visibleStations -> stationsInBounds
+        const prices = fuelPrices.value[station.id];
+        if (prices && prices[selectedFuelType.value] > 0) {
+          actualLowestPrice = Math.min(actualLowestPrice, prices[selectedFuelType.value]);
+        }
+      });
+    }
+    // 최저 가격이 Infinity가 아닌 경우에만 유효한 최저가로 간주
+    const hasValidLowestPrice = actualLowestPrice !== Infinity;
 
     const lowestPriceMarkerImageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/markerStar.png';
     const normalMarkerImageUrl = 'https://t1.daumcdn.net/localimg/localimages/07/mapapidoc/marker_red.png'; // HTTPS URL 사용
@@ -61,7 +82,7 @@ export function useMapDisplay(mapInstance, visibleStations, lowestPriceStations,
     const lowestPriceMarkerImage = new window.kakao.maps.MarkerImage(lowestPriceMarkerImageUrl, imageSize);
     const normalMarkerImage = new window.kakao.maps.MarkerImage(normalMarkerImageUrl, imageSize);
 
-    visibleStations.value.forEach((station) => {
+    stationsInBounds.value.forEach((station) => { // visibleStations -> stationsInBounds
       // 가격 정보 확인 (마커 생성 전)
       const stationPrices = fuelPrices.value[station.id];
       if (!stationPrices || !(stationPrices[selectedFuelType.value] > 0)) {
@@ -72,15 +93,25 @@ export function useMapDisplay(mapInstance, visibleStations, lowestPriceStations,
       if (!station || !station.lat || !station.lng) return;
 
       const markerPosition = new window.kakao.maps.LatLng(station.lat, station.lng);
-      const isTop10Lowest = lowestPriceStationIds.has(station.id);
-      const markerImage = isTop10Lowest ? lowestPriceMarkerImage : normalMarkerImage;
+      // 현재 주유소 가격 가져오기
+      const currentStationPrice = fuelPrices.value[station.id]?.[selectedFuelType.value];
+      // 실제 최저가와 비교하여 뱃지 표시 여부 결정
+      const isActualLowestPrice = hasValidLowestPrice && currentStationPrice === actualLowestPrice;
+      const markerImage = isActualLowestPrice ? lowestPriceMarkerImage : normalMarkerImage;
       const marker = new window.kakao.maps.Marker({ position: markerPosition, title: station.osnm, image: markerImage });
 
       // 인포윈도우 내용 생성
       const priceContent = formatPriceLocal(station.id); // 임시 로컬 함수 사용
       const distanceContent = formatDistanceLocal(station); // 임시 로컬 함수 사용
       const stationName = station.osnm || '이름 없음';
-      const infowindowContent = `<div style="padding:7px;font-size:12px;line-height:1.5;"><strong style="font-size:13px;">${stationName}</strong><br>${priceContent}${distanceContent}</div>`;
+      const lowestPriceBadge = isActualLowestPrice ? '<span style="color: #FF0000; font-size: 12px; font-weight: bold; margin-left: 6px; vertical-align: middle; background-color: #FFFFE0; padding: 1px 4px; border-radius: 3px;">★최저가</span>' : '';
+      const infowindowContent = `
+        <div style="padding: 12px 16px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.12); font-family: 'Malgun Gothic', Dotum, '돋움', sans-serif; background-color: #fff; min-width: 180px;">
+          <strong style="font-size: 15px; font-weight: 600; color: #222; display: inline-block; margin-bottom: 6px; line-height: 1.4; vertical-align: middle;">${stationName}</strong>${lowestPriceBadge}
+          <div style="font-size: 13px; color: #444; margin-bottom: 4px; line-height: 1.5;">${priceContent}</div>
+          <div style="font-size: 12px; color: #777; line-height: 1.5;">${distanceContent}</div>
+        </div>
+      `;
       const infowindow = new window.kakao.maps.InfoWindow({ content: infowindowContent, removable: true });
 
       // 마커 클릭 이벤트
@@ -105,7 +136,7 @@ export function useMapDisplay(mapInstance, visibleStations, lowestPriceStations,
   // panToStation 함수 제거 (FuelList.vue로 이동)
 
   // visibleStations 변경 시 마커 업데이트
-  watch(visibleStations, displayMarkers, { deep: true });
+  watch(stationsInBounds, displayMarkers, { deep: true }); // visibleStations -> stationsInBounds
   // lowestPriceStations 변경 시 마커 스타일 업데이트를 위해 displayMarkers 호출
   watch(lowestPriceStations, displayMarkers, { deep: true });
   // fuelInfo (거리 정보 포함) 변경 시 마커 업데이트 (인포윈도우 내용 갱신)
