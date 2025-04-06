@@ -31,18 +31,13 @@ const props = defineProps({
 const adId = ref(`google-ad-${Math.random().toString(36).substring(2, 15)}`);
 
 onMounted(() => {
-  // 구글 광고 스크립트가 로드되었는지 확인
-  if (window.adsbygoogle) {
-    loadAd();
-  } else {
-    // 구글 광고 스크립트 로드
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = 'https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6491895061878011';
-    script.crossOrigin = 'anonymous';
-    script.onload = loadAd;
-    document.head.appendChild(script);
-  }
+  // index.html에서 이미 adsbygoogle 스크립트를 로드하므로,
+  // 여기서는 광고 로드만 처리합니다.
+  // window.adsbygoogle가 로드될 때까지 기다릴 필요 없이 바로 loadAd를 호출합니다.
+  // Vue의 onMounted 훅은 DOM이 준비된 후에 실행되므로,
+  // 이 시점에는 index.html의 스크립트가 로드되었거나 로드 중일 가능성이 높습니다.
+  // adsbygoogle.push({})는 스크립트 로드가 완료되면 자동으로 큐를 처리합니다.
+  loadAd();
 });
 
 const loadAd = () => {
@@ -77,7 +72,7 @@ const loadAd = () => {
 <style scoped>
 .google-ad {
   width: 100%;
-  min-height: 100px;
+  height: 40px;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -87,7 +82,6 @@ const loadAd = () => {
 
 .ad-container {
   width: 100%;
-  min-height: 100px;
 }
 
 /* 사이드바 광고 스타일 */

@@ -19,7 +19,7 @@
     </footer> -->
     
     <!-- 사이드바 광고 컴포넌트 -->
-    <SidebarAds />
+    <!-- <SidebarAds /> -->
   </div>
 </template>
 
@@ -271,5 +271,24 @@ main {
   .nav-link {
     padding: var(--spacing-1) var(--spacing-2);
   }
+}
+
+/* 카카오맵 인포윈도우 기본 테두리 제거 */
+.wrap.infowindow, /* 카카오맵에서 사용하는 일반적인 클래스 조합 */
+.infowindow_wrap, /* 또 다른 가능한 클래스 */
+.infowindow { /* 가장 일반적인 클래스 */
+  border: none !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12) !important; /* 기존 그림자는 유지하거나 필요시 제거 */
+  background-color: transparent !important; /* 배경색 투명하게 하여 내부 div 스타일만 보이도록 */
+}
+
+/* 인포윈도우 내용 영역의 불필요한 테두리 방지 (useMapDisplay.js에서 이미 처리했지만 확실히) */
+.wrap .info {
+  border: none !important;
+}
+
+/* 인포윈도우 닫기 버튼 스타일 조정 (선택 사항) */
+.infowindow_close {
+  /* 필요한 경우 스타일 조정 */
 }
 </style>

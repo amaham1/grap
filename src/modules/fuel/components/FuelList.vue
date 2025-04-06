@@ -60,7 +60,7 @@
       <div id="map" :class="{ 'map-hidden': isLoading || error }"></div>
       <!-- 내 위치로 이동 버튼 -->
       <button @click="moveToCurrentLocation" class="current-location-btn" title="내 위치로 이동">
-        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2L12 6"/><path d="M12 18L12 22"/><path d="M4.93 4.93L7.76 7.76"/><path d="M16.24 16.24L19.07 19.07"/><path d="M2 12L6 12"/><path d="M18 12L22 12"/><path d="M4.93 19.07L7.76 16.24"/><path d="M16.24 7.76L19.07 4.93"/><circle cx="12" cy="12" r="4"/></svg>
+        <i class="fas fa-location-crosshairs"></i> <!-- Font Awesome 아이콘으로 변경 -->
       </button>
     </div>
   </div>

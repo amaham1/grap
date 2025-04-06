@@ -1,10 +1,8 @@
 <template>
-  <div class="sidebar-ads" v-if="showAds">
-    <div class="left-sidebar">
-      <GoogleAd adSlot="1234567890" adClass="sidebar" />
-    </div>
-    <div class="right-sidebar">
-      <GoogleAd adSlot="0987654321" adClass="sidebar" />
+  <div class="bottom-ads" v-if="showAds">
+    <div class="bottom-ads-container">
+      <!-- TODO: 하단 광고에 적합한 광고 슬롯 ID로 변경 필요 -->
+      <GoogleAd adSlot="1234567890" adClass="bottom-banner" />
     </div>
   </div>
 </template>
@@ -13,7 +11,7 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRoute } from 'vue-router';
 // 중복된 import 제거
-import GoogleAd from './GoogleAd.vue'; // 동일 폴더 내 상대 경로 사용
+import GoogleAd from '@/components/ads/GoogleAd.vue'; // GoogleAd 컴포넌트 경로 수정 (프로젝트 구조에 맞게 확인 필요)
 
 const route = useRoute();
 
@@ -24,36 +22,32 @@ const showAds = computed(() => {
 </script>
 
 <style scoped>
-.sidebar-ads {
+.bottom-ads {
   position: fixed;
-  top: 0;
+  bottom: 0;
   left: 0;
   width: 100%;
+  height: 60px; /* 모바일 광고 높이 (조정 가능) */
+  background-color: #f8f9fa; /* 배경색 추가 (선택 사항) */
+  border-top: 1px solid #dee2e6; /* 상단 경계선 (선택 사항) */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000; /* 다른 요소 위에 오도록 z-index 조정 */
+  pointer-events: auto; /* 광고 클릭 가능하도록 설정 */
+}
+
+.bottom-ads-container {
+  /* 광고 컨텐츠 레이아웃 조정 (필요시) */
+  width: 100%;
   height: 100%;
-  pointer-events: none;
-  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
-.left-sidebar, .right-sidebar {
-  position: absolute;
-  top: 90px; /* 헤더 높이 + 여백 */
-  width: 160px;
-  height: calc(100vh - 120px);
-  pointer-events: auto;
-}
-
-.left-sidebar {
-  left: 10px;
-}
-
-.right-sidebar {
-  right: 10px;
-}
-
-/* 화면이 작을 때는 사이드바 광고 숨김 */
-@media (max-width: 1400px) {
-  .sidebar-ads {
-    display: none;
-  }
+/* GoogleAd 컴포넌트 자체 스타일 조정이 필요할 수 있음 */
+:deep(.bottom-banner) { /* GoogleAd 내부 클래스에 스타일 적용 (클래스명 확인 필요) */
+  /* 예시: width: 100%; height: 100%; */
 }
 </style>
