@@ -87,7 +87,7 @@ export const fetchFuelPrices = async () => {
   const apiCode = import.meta.env.VITE_FUEL_API_CODE;
   // 개발 환경에서는 프록시 경로 사용, 프로덕션 환경에서는 환경 변수 또는 기본 URL 사용
   const apiUrl = import.meta.env.DEV
-    ? `/api/its/api/infoGasPriceList?code=${apiCode}` // Corrected endpoint: infoGasPriceList
+    ? `https://grapserver.du.r.appspot.com/api/infoGasPriceList?code=${apiCode}` // Corrected endpoint: infoGasPriceList
     : `${import.meta.env.VITE_FUEL_API_BASE_URL || 'https://grapserver.du.r.appspot.com'}/api/infoGasPriceList?code=${apiCode}`; // Corrected endpoint: infoGasPriceList
 
   try {
