@@ -12,13 +12,10 @@ const PRICE_CACHE_DURATION = 30 * 60 * 1000; // 가격 캐시 유효 기간: 30�
 // 기존 parseAndTransformFuelData, fetchFuelInfo 함수 제거 (fuelApi 사용)
 
 const loadFuelInfo = async () => {
-  console.log("useFuelInfo.js: Checking cache for fuel info..."); // 캐시 확인 로그
   const cachedData = getCachedData(CACHE_KEY, CACHE_DURATION); // Use imported cache function
   if (cachedData) {
-    console.log("useFuelInfo.js: Found cached fuel info. Returning cached data."); // 캐시 히트 로그
     return cachedData;
   } else {
-    console.log("useFuelInfo.js: No valid cache found for fuel info. Fetching new data..."); // 캐시 미스 로그
     try {
       const fetchedData = await fetchFuelInfo(); // Use imported API function
       if (fetchedData && fetchedData.length > 0) {
@@ -38,13 +35,10 @@ const loadFuelInfo = async () => {
 
 // 유가 정보 로드 함수 (캐시 우선)
 const loadFuelPrices = async () => {
-  console.log("useFuelInfo.js: Checking cache for fuel prices..."); // 캐시 확인 로그
   const cachedPrices = getCachedData(PRICE_CACHE_KEY, PRICE_CACHE_DURATION);
   if (cachedPrices) {
-    console.log("useFuelInfo.js: Found cached fuel prices. Returning cached data."); // 캐시 히트 로그
     return cachedPrices;
   } else {
-    console.log("useFuelInfo.js: No valid cache found for fuel prices. Fetching new data..."); // 캐시 미스 로그
     try {
       const fetchedPrices = await fetchFuelPrices(); // Use imported API function
       if (fetchedPrices && Object.keys(fetchedPrices).length > 0) {
@@ -69,7 +63,6 @@ export function useFuelInfo() {
   const error = ref(null); // 통합 에러 상태
   // 주유소 정보 로드 함수 (기본 정보 + 가격 정보)
   const getFuelData = async () => {
-    console.log("useFuelInfo.js: getFuelData function started."); // getFuelData 시작 로그
     isLoadingInfo.value = true;
     isLoadingPrices.value = true;
     error.value = null;
@@ -82,12 +75,9 @@ export function useFuelInfo() {
 
       // console.log("Data received from loadFuelInfo:", infoData);
       // 초기 distance 상태 설정 (undefined)
-      console.log("useFuelInfo.js: Assigning infoData to fuelInfo ref:", infoData); // infoData 할당 전 로그
       fuelInfo.value = infoData.map(station => ({ ...station, distance: undefined }));
 
-      console.log("useFuelInfo.js: Assigning priceData to fuelPrices ref:", priceData); // priceData 할당 전 로그
       fuelPrices.value = priceData;
-      console.log("useFuelInfo.js: Data assignment complete."); // 데이터 할당 완료 로그
 
     } catch (err) {
       console.error("Error during data loading:", err);
@@ -95,10 +85,8 @@ export function useFuelInfo() {
       fuelInfo.value = [];
       fuelPrices.value = {};
     } finally {
-      console.log("useFuelInfo.js: Setting isLoadingInfo and isLoadingPrices to false."); // finally 블록 시작 로그
       isLoadingInfo.value = false;
       isLoadingPrices.value = false;
-      console.log("useFuelInfo.js: Loading flags set to false."); // 로딩 플래그 변경 완료 로그
     }
   };
 
@@ -110,7 +98,6 @@ export function useFuelInfo() {
       return;
     }
 
-    console.log("useFuelInfo.js: Starting distance calculation..."); // 거리 계산 시작 로그
     isCalculatingDistances.value = true;
     // console.log(`Starting distance calculation for ${stationsToCalculate.length} stations from:`, currentLocation);
     error.value = null; // 거리 계산 에러 초기화
@@ -160,9 +147,7 @@ export function useFuelInfo() {
       });
       fuelInfo.value = errorUpdatedFuelInfo;
     } finally {
-      console.log("useFuelInfo.js: Setting isCalculatingDistances to false."); // finally 블록 시작 로그
       isCalculatingDistances.value = false;
-      console.log("useFuelInfo.js: isCalculatingDistances flag set to false."); // 로딩 플래그 변경 완료 로그
     }
   };
 

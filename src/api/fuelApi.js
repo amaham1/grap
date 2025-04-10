@@ -60,23 +60,25 @@ const parseAndTransformFuelData = (jsonString) => {
 
 // 제주 주유소 기본 정보 API 호출 함수
 export const fetchFuelInfo = async () => {
-  const apiCode = import.meta.env.VITE_FUEL_API_CODE;
-  // 개발 환경에서는 프록시 경로 사용, 프로덕션 환경에서는 환경 변수 또는 기본 URL 사용
-  const apiUrl = import.meta.env.DEV
-    ? `/api/its/api/infoGasInfoList?code=${apiCode}`
-    : `${import.meta.env.VITE_FUEL_API_BASE_URL || 'http://api.jejuits.go.kr'}/api/infoGasInfoList?code=${apiCode}`;
+  // 새 API 엔드포인트로 변경
+  const apiUrl = 'https://grapserver.du.r.appspot.com/api/fuel-list';
 
   try {
     const response = await fetch(apiUrl);
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    const jsonText = await response.text();
-    const structuredData = parseAndTransformFuelData(jsonText);
-    return structuredData;
+    // 새로운 API는 표준 JSON을 반환한다고 가정하고 response.json() 사용
+    const jsonData = await response.json(); 
+
+    console.log('API 응답 데이터:', jsonData); 
+    // API에서 받은 JSON 데이터를 그대로 반환 (필요시 가공 로직 추가)
+    return jsonData; 
+
   } catch (error) {
-    console.error("Failed to fetch or process fuel info:", error);
-    throw error; // 에러를 다시 던져서 호출 측에서 처리하도록 함
+    console.error("API 호출 또는 데이터 처리 중 오류 발생:", error); // 오류 메시지 명확화
+    // 에러 발생 시 빈 배열 또는 적절한 기본값 반환 고려
+    return []; // 또는 throw error; 로 변경하여 호출 측에서 처리
   }
 };
 
@@ -86,7 +88,7 @@ export const fetchFuelPrices = async () => {
   // 개발 환경에서는 프록시 경로 사용, 프로덕션 환경에서는 환경 변수 또는 기본 URL 사용
   const apiUrl = import.meta.env.DEV
     ? `/api/its/api/infoGasPriceList?code=${apiCode}` // Corrected endpoint: infoGasPriceList
-    : `${import.meta.env.VITE_FUEL_API_BASE_URL || 'http://api.jejuits.go.kr'}/api/infoGasPriceList?code=${apiCode}`; // Corrected endpoint: infoGasPriceList
+    : `${import.meta.env.VITE_FUEL_API_BASE_URL || 'https://grapserver.du.r.appspot.com'}/api/infoGasPriceList?code=${apiCode}`; // Corrected endpoint: infoGasPriceList
 
   try {
     const response = await fetch(apiUrl);

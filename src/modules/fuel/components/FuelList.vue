@@ -141,7 +141,6 @@ const initialCalcDone = ref(false); // 초기 거리 계산 완료 플래그
 
 // --- 생명주기 훅 ---
 onMounted(async () => {
-  console.log("FuelList.vue: onMounted hook started."); // onMounted 시작 로그
   let initialCenter = { lat: 33.4996, lng: 126.5312 };
   try {
     // getCurrentLocation 사용 (geolocationUtils에서 import)
@@ -165,9 +164,7 @@ onMounted(async () => {
     mapInstance.value = initializedMap.value;
 
     displayCurrentLocation(mapInstance);
-    console.log("FuelList.vue: Calling getFuelData..."); // getFuelData 호출 전 로그
     await getFuelData();
-    console.log("FuelList.vue: getFuelData call finished."); // getFuelData 호출 후 로그
 
     // 데이터 로드 후 초기 목록 및 지도 마커 동시 업데이트
     // isSingleStationView 상태 초기화 추가
@@ -233,17 +230,10 @@ watch(userLocation, (newLocation, oldLocation) => {
 
 // lowestPriceStations 변경 시 초기 거리 계산 트리거 (최초 1회만 실행)
 watch(lowestPriceStations, (newStations) => {
-  console.log("FuelList.vue: lowestPriceStations watcher triggered.");
-  console.log(`  - !initialCalcDone: ${!initialCalcDone.value}`);
-  console.log(`  - userLocation exists: ${!!userLocation.value}`);
-  console.log(`  - newStations has items: ${newStations && newStations.length > 0}`);
-
+  // lowestPriceStations 변경 시 초기 거리 계산 트리거 (최초 1회만 실행)
   if (!initialCalcDone.value && userLocation.value && newStations && newStations.length > 0) {
-    console.log("FuelList.vue: Conditions met for initial distance calculation via lowestPriceStations watcher. Calling calculateDistances...");
     calculateDistances(newStations, userLocation.value);
     initialCalcDone.value = true; // 초기 계산 완료 표시
-  } else {
-    console.log("FuelList.vue: Conditions NOT met for initial distance calculation via lowestPriceStations watcher.");
   }
 }, { immediate: false }); // immediate: false로 설정하여 초기값으로는 실행되지 않도록 함 (데이터 로드 후 변경 시 실행)
 
