@@ -1,0 +1,8 @@
+http://www.jeju.go.kr/rest/JejuExhibitionService/getJejucultureExhibitionList
+-OpenAPI활용가이드(F07.제주문화예술진흥원 공연전시 정보)V1.0
+https://www.jeju.go.kr/rest/JejuWelfareServiceInfo/getJejuWelfareServiceInfoList
+-OpenAPI활용가이드(제주도청_D01_제주복지서비스정보)_v1.1asad
+https://www.jeju.go.kr/api/jejutoseoul/festival/
+-OpenAPI활용가이드(중앙협력본부 행사축제소식)V1.0
+https://www.jejunolda.com/api/event/
+-OpenAPI활용가이드(I01.제주특별자치도 전시문화행사정보)V1.0

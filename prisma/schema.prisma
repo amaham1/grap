@@ -1,0 +1,43 @@
+// prisma/schema.prisma
+// DB schema for Jeju Events & Support Programs portal
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Event {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  location    String?
+  startDate   DateTime
+  endDate     DateTime?
+  approved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model SupportProgram {
+  id          Int      @id @default(autoincrement())
+  title       String
+  description String
+  targetGroup String?
+  link        String?
+  startDate   DateTime?
+  endDate     DateTime?
+  approved    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model AdminUser {
+  id        Int      @id @default(autoincrement())
+  email     String   @unique
+  password  String   // hashed
+  createdAt DateTime @default(now())
+}

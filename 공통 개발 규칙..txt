@@ -1,0 +1,70 @@
+공통 개발 규칙.
+-코드 스타일 및 포맷팅:
+Prettier 사용: 모든 코드에 Prettier를 적용하며, 프로젝트 루트의 .prettierrc.js 설정 파일을 따릅니다.
+ESLint 사용: 공유된 .eslintrc.js 설정 파일에 따라 ESLint 규칙을 준수합니다. TypeScript, React, Hooks, Accessibility, Prettier 관련 규칙을 포함합니다.
+
+- 네이밍 컨벤션:
+변수, 함수: camelCase (예: eventList, WorkspaceData)
+React 컴포넌트: PascalCase (예: EventCard, AdminLayout), 파일명도 동일하게 (예: EventCard.tsx)
+파일 (컴포넌트 외): kebab-case (예: api-client.ts, prisma-helpers.ts)
+API 라우트 파일: kebab-case (예: pages/api/published-events.ts)
+데이터베이스 테이블: snake_case (예: events, support_programs)
+데이터베이스 컬럼: snake_case (예: event_title, created_at). Prisma 스키마에서 @map 속성을 사용하여 코드의 camelCase 필드와 매핑합니다.
+상수: UPPER_SNAKE_CASE (예: MAX_PAGE_SIZE = 100)
+타입/인터페이스: PascalCase (예: interface EventData { ... })
+
+-디렉토리 구조:
+Next.js 기본 구조(app/, public/, styles/)를 따릅니다.
+components/: 재사용 가능한 UI 컴포넌트 (기능별 하위 폴더 구성 가능)
+lib/: Prisma 클라이언트 인스턴스, 외부 API 클라이언트, 공통 유틸리티 함수 등
+hooks/: 커스텀 React Hooks
+types/: 공유되는 TypeScript 타입 정의
+prisma/: Prisma 스키마 파일 및 마이그레이션 파일
+
+- API 설계 (Next.js API Routes):
+응답 구조: { success: boolean, data: T | null, error: string | null } JSON 구조를 사용합니다.
+HTTP 상태 코드: 상황에 맞는 표준 상태 코드(200, 201, 400, 401, 403, 404, 500 등)를 사용합니다.
+오류 처리: try...catch로 서버 오류를 처리하고, 표준 오류 응답 및 상태 코드를 반환하며, 서버 측 로그를 기록합니다.
+상태 변경: 데이터의 부분 업데이트(예: 상태 변경)는 PATCH 메소드를 사용합니다.
+입력값 검증: Zod 라이브러리를 사용하여 모든 API 요청의 파라미터 및 본문 데이터를 검증합니다.
+
+- 데이터베이스 연동 (Prisma):
+Prisma Client 싱글톤: lib/prisma.ts에서 Prisma 클라이언트 인스턴스를 싱글톤으로 관리합니다.
+마이그레이션 사용: prisma migrate dev, prisma migrate deploy 명령어로 스키마 변경을 관리합니다. DB 직접 수정은 금지합니다.
+필요한 필드만 조회: select 또는 include 옵션으로 필요한 데이터만 명시적으로 조회합니다.
+
+- 컴포넌트 개발 (React/Next.js):
+함수형 컴포넌트 및 Hooks 사용: 표준으로 사용합니다.
+Props 타입 정의: TypeScript 인터페이스/타입으로 명확히 정의합니다.
+재사용성: 작고 재사용 가능한 컴포넌트 설계를 지향합니다.
+접근성 (Accessibility): 시맨틱 HTML 및 필요한 ARIA 속성 사용 등 웹 접근성 지침을 준수합니다.
+
+- 오류 처리:
+API 오류: 서버 측 로깅과 함께, 프론트엔드에는 사용자 친화적 메시지/상태를 전달합니다.
+프론트엔드 오류: React Error Boundaries로 렌더링 오류를 처리하고, SWR의 오류 상태를 활용하여 데이터 로딩 실패를 처리합니다.
+
+- 문서화:
+코드 주석: JSDoc/TSDoc 형식으로 복잡한 로직, 타입, Props 등에 주석을 추가합니다.
+README: README.md 파일에 프로젝트 설정, 실행 방법, 주요 결정 사항, 폴더 구조를 최신 상태로 유지합니다.
+
+- 의존성 관리:
+패키지 매니저: npm을 사용합니다. (package-lock.json 포함)
+라이브러리 추가: 신중하게 검토하고 팀과 합의 후 추가합니다. 정기적으로 업데이트합니다.
+보안:
+
+민감 정보 관리: 환경 변수(.env.local, Vercel 환경 변수)를 통해서만 관리합니다.
+입력값 검증: 모든 외부 입력 데이터는 서버 측에서 검증합니다.
+인가 처리: 관리자 기능 및 API 접근 권한을 명확히 제어합니다.
+
+- API 라우트 작성 공통 규칙
+기존 공통 규칙(1~12번) 외에, app/api/ 경로 아래의 API 라우트(route.ts) 파일 작성 시 다음 규칙을 준수합니다.
+
+13. NextRequest 및 NextResponse 사용:
+* API 핸들러 함수에서는 NextRequest 타입을 사용하여 요청 객체에 접근하고, NextResponse.json()을 사용하여 표준 형식의 JSON 응답을 반환합니다.
+* 예시: import { NextRequest, NextResponse } from 'next/server'; export async function GET(request: NextRequest) { ... }
+
+14. 명확한 요청 데이터 접근:
+* HTTP 메소드: request.method 속성으로 확인합니다. (App Router에서는 함수 이름(GET, POST 등)으로 구분)
+* 쿼리 파라미터: request.nextUrl.searchParams.get('paramName')을 사용합니다.
+* 경로 파라미터: 함수의 두 번째 인자({ params })를 통해 구조 분해 할당으로 접근합니다. (예: export async function PATCH(req, { params }: { params: { id: string } }))
+* 요청 본문(Body): await request.json()을 사용하여 JSON 본문을 파싱합니다. (반드시 try...catch로 감싸야 함)

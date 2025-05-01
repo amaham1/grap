@@ -1,0 +1,9 @@
+코어 프레임워크	Next.js
+언어	TypeScript
+DB 연동	Prisma
+데이터베이스	MariaDB
+스타일링	Tailwind CSS
+상태 관리 (Client)	SWR
+Next.js 배포	Vercel
+DB 배포	AWS RDS (for MariaDB)	
+스케줄링 트리거	Vercel Cron Jobs	
