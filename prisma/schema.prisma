@@ -20,6 +20,7 @@ model Event {
   approved    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  @@map("event")
 }
 
 model SupportProgram {
@@ -33,6 +34,7 @@ model SupportProgram {
   approved    Boolean  @default(false)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  @@map("support_program")
 }
 
 model AdminUser {
@@ -40,4 +42,31 @@ model AdminUser {
   email     String   @unique
   password  String   // hashed
   createdAt DateTime @default(now())
+  @@map("admin_user")
+}
+
+// 추가된 모델: 외부 API 전시 정보 저장
+model ExternalExhibition {
+  id           Int      @id @default(autoincrement())
+  seq          Int      @unique // API의 seq를 고유 식별자로 사용
+  title        String
+  category     String?
+  categoryName String?
+  cover        String?
+  coverThumb   String?
+  startDate    DateTime? @map("start_date") // Prisma는 DateTime으로 관리, DB 컬럼명은 start_date
+  endDate      DateTime? @map("end_date")   // Prisma는 DateTime으로 관리, DB 컬럼명은 end_date
+  hour         String?   // 시간 정보는 문자열로 유지
+  pay          String?
+  locs         String?   // API 필드명 유지
+  locNames     String?
+  owner        String?
+  tel          String?
+  stat         String?
+  divName      String?
+  intro        String?   @db.Text // 긴 소개 내용을 위해 Text 타입 사용
+  approved     Boolean   @default(false) // 관리자 승인 여부
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  @@map("external_exhibition")
 }
