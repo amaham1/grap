@@ -1,40 +1,36 @@
 'use client';
 import { useState, useEffect } from 'react';
 
-interface ExternalExhibition {
-  id: number; // Primary key
-  seq: number; // Sequence number from source
+interface JunoldaEvent {
+  id: number; 
   title: string;
   beginDate: string;
   endDate: string;
-  charge: string | null;
-  homepage: string | null;
-  place: string | null;
-  approved: boolean; // 승인 상태 추가
+  organizer: string | null;
+  approved: boolean; 
 }
 
-export default function ExternalExhibitionsAdminPage() {
+export default function JunoldaEventsAdminPage() {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || '';
-  const [exhibitions, setExhibitions] = useState<ExternalExhibition[]>([]);
+  const [events, setEvents] = useState<JunoldaEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  const fetchExhibitions = async () => {
+  const fetchEvents = async () => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`${basePath}/api/external-exhibitions`);
+      const res = await fetch(`${basePath}/api/junolda-events`);
       if (!res.ok) throw new Error('데이터를 불러오는데 실패했습니다.');
       const json = await res.json();
       if (json.success) {
-        // 날짜 형식 변환
-        setExhibitions(
-          json.data.map((ex: any) => ({
-            ...ex,
-            beginDate: ex.beginDate ? new Date(ex.beginDate).toLocaleDateString('ko-KR') : '',
-            endDate: ex.endDate ? new Date(ex.endDate).toLocaleDateString('ko-KR') : '',
+        setEvents(
+          json.data.map((event: any) => ({
+            ...event,
+            beginDate: event.beginDate ? new Date(event.beginDate).toLocaleDateString('ko-KR') : '',
+            endDate: event.endDate ? new Date(event.endDate).toLocaleDateString('ko-KR') : '',
           }))
         );
       } else {
@@ -48,21 +44,21 @@ export default function ExternalExhibitionsAdminPage() {
   };
 
   useEffect(() => {
-    fetchExhibitions();
+    fetchEvents();
   }, []);
 
   const handleToggleApproval = async (id: number, currentStatus: boolean) => {
     try {
-      const res = await fetch(`${basePath}/api/external-exhibitions`, {
+      const res = await fetch(`${basePath}/api/junolda-events`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: id, approved: !currentStatus }),
+        body: JSON.stringify({ id: id, approved: !currentStatus }), 
       });
       const json = await res.json();
       if (res.ok && json.success) {
-        setExhibitions((prevExhibitions) =>
-          prevExhibitions.map((ex) =>
-            ex.id === id ? { ...ex, approved: !currentStatus } : ex
+        setEvents((prevEvents) =>
+          prevEvents.map((e) =>
+            e.id === id ? { ...e, approved: !currentStatus } : e 
           )
         );
       } else {
@@ -73,48 +69,44 @@ export default function ExternalExhibitionsAdminPage() {
     }
   };
 
-  const totalPages = Math.ceil(exhibitions.length / ITEMS_PER_PAGE);
-  const displayedExhibitions = exhibitions.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil(events.length / ITEMS_PER_PAGE);
+  const displayedEvents = events.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   if (loading) return <div className="p-4">로딩 중...</div>;
   if (error) return <div className="p-4 text-red-500">오류: {error}</div>;
 
   return (
     <div className="p-4 bg-white">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">외부 전시회 목록</h1>
+      <h1 className="text-2xl font-bold mb-6 text-gray-800">전시문화 행사 목록</h1>
       <div className="overflow-x-auto shadow-md rounded-lg border border-gray-200">
         <table className="min-w-full bg-white">
           <thead className="bg-gray-50 border-b border-gray-200">
             <tr>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Seq</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">제목</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">행사명</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">시작일</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">종료일</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">장소</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">요금</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">주최</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">승인 상태</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">작업</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {displayedExhibitions.map((ex) => (
-              <tr key={ex.id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ex.id}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ex.seq}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{ex.title}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ex.beginDate}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ex.endDate}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ex.place ?? '-'}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{ex.charge ?? '-'}</td>
-                <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${ex.approved ? 'text-green-600' : 'text-red-600'}`}>
-                  {ex.approved ? '승인됨' : '미승인'}
+            {displayedEvents.map((e) => (
+              <tr key={e.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{e.id}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{e.title}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{e.beginDate}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{e.endDate}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{e.organizer ?? '-'}</td>
+                <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${e.approved ? 'text-green-600' : 'text-red-600'}`}>
+                  {e.approved ? '승인됨' : '미승인'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm">
                   <button
-                    onClick={() => handleToggleApproval(ex.id, ex.approved)}
-                    className={`px-3 py-1 rounded text-white text-xs font-medium ${ex.approved ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'}`}>
-                    {ex.approved ? '미승인 처리' : '승인 처리'}
+                    onClick={() => handleToggleApproval(e.id, e.approved)} 
+                    className={`px-3 py-1 rounded text-white text-xs font-medium ${e.approved ? 'bg-yellow-500 hover:bg-yellow-600' : 'bg-green-500 hover:bg-green-600'}`}>
+                    {e.approved ? '미승인 처리' : '승인 처리'}
                   </button>
                 </td>
               </tr>
@@ -122,7 +114,6 @@ export default function ExternalExhibitionsAdminPage() {
           </tbody>
         </table>
       </div>
-      {/* Pagination Controls */} 
       {totalPages > 1 && (
         <div className="flex justify-center items-center mt-4">
           <button

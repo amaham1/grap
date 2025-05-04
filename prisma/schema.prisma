@@ -70,3 +70,63 @@ model ExternalExhibition {
   updatedAt    DateTime @updatedAt @map("updated_at")
   @@map("external_exhibition")
 }
+
+model WelfareService {
+  id           Int      @id @default(autoincrement())
+  seq          Int      @unique
+  name         String
+  allLoc       Boolean  @map("all_loc")
+  jejuLoc      Boolean  @map("jeju_loc")
+  seogwipoLoc  Boolean  @map("seogwipo_loc")
+  support      String?  @db.Text
+  contents     String?  @db.Text
+  application  String?  @db.Text
+  approved     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt   @map("updated_at")
+  @@map("welfare_service")
+}
+
+model Festival {
+  id           Int      @id @default(autoincrement())
+  seq          Int      @unique
+  no           Int?
+  title        String
+  writeDate    DateTime @map("write_date")
+  writer       String?
+  url          String?
+  contents     String?  @db.Text
+  createdAt    DateTime @default(now())     @map("created_at")
+  updatedAt    DateTime @updatedAt         @map("updated_at")
+  @@map("festival")
+}
+
+model JunoldaEvent {
+  id           Int      @id @default(autoincrement())
+  seq          Int      @unique
+  no           Int?
+  title        String
+  writeDate    DateTime? @map("write_date")
+  writer       String?
+  url          String?
+  contents     String?   @db.Text
+  createdAt    DateTime  @default(now())    @map("created_at")
+  updatedAt    DateTime  @updatedAt         @map("updated_at")
+  approved     Boolean   @default(false)
+  @@map("junolda_event")
+}
+
+model JejuEvent {
+  id           Int      @id @default(autoincrement())
+  seq          Int      @unique
+  no           Int?
+  title        String
+  writeDate    DateTime @map("write_date")
+  writer       String?
+  url          String?
+  contents     String?  @db.Text
+  approved     Boolean  @default(false)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  @@map("jeju_event")
+}

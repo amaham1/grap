@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
         stat: item.stat ?? null,
         divName: item.divName ?? null,
         intro: item.intro ?? null,
+        approved: true
       };
       await prisma.externalExhibition.upsert({
         where: { seq },
@@ -73,4 +74,38 @@ export async function GET(request: NextRequest) {
   const where = approvedParam !== null ? { approved: approvedParam === 'true' } : {};
   const data = await prisma.externalExhibition.findMany({ where, orderBy: { seq: 'asc' } });
   return NextResponse.json({ success: true, data });
+}
+
+// PATCH /api/external-exhibitions (Update approval status)
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { id, approved } = body; // ExternalExhibition uses 'id'
+
+    if (typeof id !== 'number' || isNaN(id)) {
+      return NextResponse.json({ success: false, error: 'Invalid ID' }, { status: 400 });
+    }
+    if (typeof approved !== 'boolean') {
+      return NextResponse.json({ success: false, error: 'Invalid approved status' }, { status: 400 });
+    }
+
+    // Check if the record exists before updating
+    const existingExhibition = await prisma.externalExhibition.findUnique({
+      where: { id },
+    });
+
+    if (!existingExhibition) {
+      return NextResponse.json({ success: false, error: 'External exhibition not found' }, { status: 404 });
+    }
+
+    const updatedExhibition = await prisma.externalExhibition.update({
+      where: { id },
+      data: { approved },
+    });
+
+    return NextResponse.json({ success: true, data: updatedExhibition });
+  } catch (error) {
+    console.error('Failed to update external exhibition approval:', error);
+    return NextResponse.json({ success: false, error: 'Internal Server Error' }, { status: 500 });
+  }
 }

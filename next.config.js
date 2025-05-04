@@ -3,4 +3,10 @@ const nextConfig = {
   /* config options here */
 };
 
-module.exports = nextConfig;
+module.exports = {
+  ...nextConfig,
+  basePath: '/alljeju',
+  env: {
+    NEXT_PUBLIC_BASE_PATH: '/alljeju'
+  }
+};

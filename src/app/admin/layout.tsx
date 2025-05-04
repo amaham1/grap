@@ -10,6 +10,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const menuItems = [
     { label: '대시보드', href: '/admin/dashboard' },
     { label: '외부전시', href: '/admin/external-exhibitions' },
+    { label: '복지 서비스', href: '/admin/welfare-services' },
+    { label: '제주 행사', href: '/admin/jeju-events' },
+    { label: '전시문화 행사', href: '/admin/junolda-events' },
   ];
 
   return (
