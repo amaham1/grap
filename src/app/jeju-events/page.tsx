@@ -31,7 +31,7 @@ export default async function JejuEventsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((e) => (
-            <Link href={`/jeju-events/${e.seq}`} key={e.seq} className="block">
+            <Link href={`/jeju-events/${e.id}`} key={e.id} className="block">
               <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
                 <div className="h-48 bg-gray-100 relative">
                   {/* 임시 이미지 플레이스홀더 */}

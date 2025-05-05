@@ -2,13 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 
-interface Props { params: { seq: string } }
+interface Props { params: { id: string } }
 
-export default async function ExternalExhibitionDetailPage({ params: { seq } }: Props) {
-  const id = parseInt(seq, 10);
-  if (isNaN(id)) return notFound();
+export default async function ExternalExhibitionDetailPage({ params: { id: idString } }: Props) {
+  const idNum = parseInt(idString, 10);
+  if (isNaN(idNum)) return notFound();
 
-  const exhibition = await prisma.externalExhibition.findUnique({ where: { seq: id } });
+  const exhibition = await prisma.externalExhibition.findUnique({ where: { id: idNum } });
   if (!exhibition) return notFound();
 
   return (

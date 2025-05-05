@@ -10,33 +10,6 @@ generator client {
   provider = "prisma-client-js"
 }
 
-model Event {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String
-  location    String?
-  startDate   DateTime
-  endDate     DateTime?
-  approved    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  @@map("event")
-}
-
-model SupportProgram {
-  id          Int      @id @default(autoincrement())
-  title       String
-  description String
-  targetGroup String?
-  link        String?
-  startDate   DateTime?
-  endDate     DateTime?
-  approved    Boolean  @default(false)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  @@map("support_program")
-}
-
 model AdminUser {
   id        Int      @id @default(autoincrement())
   email     String   @unique
@@ -45,7 +18,6 @@ model AdminUser {
   @@map("admin_user")
 }
 
-// 추가된 모델: 외부 API 전시 정보 저장
 model ExternalExhibition {
   id           Int      @id @default(autoincrement())
   seq          Int      @unique // API의 seq를 고유 식별자로 사용
@@ -56,15 +28,15 @@ model ExternalExhibition {
   coverThumb   String?
   startDate    DateTime? @map("start_date") // Prisma는 DateTime으로 관리, DB 컬럼명은 start_date
   endDate      DateTime? @map("end_date")   // Prisma는 DateTime으로 관리, DB 컬럼명은 end_date
-  hour         String?   // 시간 정보는 문자열로 유지
-  pay          String?
+  hour         String?  @db.Text // Text 타입으로 변경
+  pay          String?  @db.Text // Text 타입으로 변경
   locs         String?   // API 필드명 유지
   locNames     String?
   owner        String?
   tel          String?
   stat         String?
   divName      String?
-  intro        String?   @db.Text // 긴 소개 내용을 위해 Text 타입 사용
+  intro        String?  @db.Text // 긴 소개 내용을 위해 Text 타입 사용
   approved     Boolean   @default(false) // 관리자 승인 여부
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -87,35 +59,6 @@ model WelfareService {
   @@map("welfare_service")
 }
 
-model Festival {
-  id           Int      @id @default(autoincrement())
-  seq          Int      @unique
-  no           Int?
-  title        String
-  writeDate    DateTime @map("write_date")
-  writer       String?
-  url          String?
-  contents     String?  @db.Text
-  createdAt    DateTime @default(now())     @map("created_at")
-  updatedAt    DateTime @updatedAt         @map("updated_at")
-  @@map("festival")
-}
-
-model JunoldaEvent {
-  id           Int      @id @default(autoincrement())
-  seq          Int      @unique
-  no           Int?
-  title        String
-  writeDate    DateTime? @map("write_date")
-  writer       String?
-  url          String?
-  contents     String?   @db.Text
-  createdAt    DateTime  @default(now())    @map("created_at")
-  updatedAt    DateTime  @updatedAt         @map("updated_at")
-  approved     Boolean   @default(false)
-  @@map("junolda_event")
-}
-
 model JejuEvent {
   id           Int      @id @default(autoincrement())
   seq          Int      @unique
@@ -129,4 +72,41 @@ model JejuEvent {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
   @@map("jeju_event")
+}
+
+model ExternalEventJejunolda {
+  id          Int       @id @default(autoincrement()) 
+  apiSeq        Int       @unique // Jejunolda 'seq' field
+  title       String?   // 'name' field
+  startDate     DateTime? // 'start' field (Unix ms)
+  endDate       DateTime? // 'end' field (Unix ms)
+  time          String?   // 'time' field
+  location    String?
+  host        String? 
+  category    String?
+  content     String?   @db.Text
+  imageUrl    String?
+  url         String?
+  categoryName  String?   // 'categoryName' field
+  payName       String?   // 'payName' field
+  locName       String?   // 'locName' field
+  intro         String?   @db.Text // 'intro' field
+  cover         String?   // 'cover' field
+  coverThumb    String?   // 'coverThumb' field
+  instituteName String?   // 'instituteName' field
+  tel           String?   // 'tel' field
+  addr1         String?   // 'addr1' field
+  addr2         String?   // 'addr2' field
+  approved    Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  @@map("external_event_jejunolda")
+}
+
+model ApiSyncStatus {
+  id            Int      @id @default(autoincrement())
+  apiIdentifier String   @unique // e.g., "jejuExhibition"
+  lastPageFetched Int?
+  lastSyncTime  DateTime @updatedAt
+  @@map("api_sync_status")
 }

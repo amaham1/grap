@@ -2,11 +2,13 @@ import { prisma } from '@/lib/prisma';
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 
-interface PageProps { params: { seq: string } }
+interface PageProps { params: { id: string } }
 
-export default async function WelfareServiceDetail({ params }: PageProps) {
-  const seq = Number(params.seq);
-  const service = await prisma.welfareService.findUnique({ where: { seq } });
+export default async function WelfareServiceDetail({ params: { id: idString } }: PageProps) {
+  const idNum = parseInt(idString, 10);
+  if (isNaN(idNum)) return notFound();
+
+  const service = await prisma.welfareService.findUnique({ where: { id: idNum } });
   if (!service) return notFound();
 
   return (

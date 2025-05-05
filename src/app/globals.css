@@ -8,38 +8,19 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-  --primary: #3b82f6;
-  --primary-hover: #2563eb;
+  --primary: #ff6b6b;
+  --primary-hover: #fa5252;
   --secondary: #f3f4f6;
   --secondary-hover: #e5e7eb;
-  --accent: #8b5cf6;
-  --accent-hover: #7c3aed;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
+  --accent: #74c0fc;
+  --accent-hover: #4dabf7;
+  --success: #51cf66;
+  --warning: #fcc419;
+  --danger: #ff6b6b;
   --border: #e5e7eb;
   --card: #ffffff;
   --card-foreground: #171717;
   --radius: 0.5rem;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0f172a;
-    --foreground: #f8fafc;
-    --primary: #3b82f6;
-    --primary-hover: #60a5fa;
-    --secondary: #1e293b;
-    --secondary-hover: #334155;
-    --accent: #8b5cf6;
-    --accent-hover: #a78bfa;
-    --success: #10b981;
-    --warning: #f59e0b;
-    --danger: #ef4444;
-    --border: #334155;
-    --card: #1e293b;
-    --card-foreground: #f8fafc;
-  }
 }
 
 /* 기본 스타일 */
