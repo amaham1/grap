@@ -5,7 +5,7 @@ import Image from 'next/image';
 export default async function ExternalExhibitionsPage() {
   const exhibitions = await prisma.externalExhibition.findMany({
     where: { approved: true },
-    orderBy: { seq: 'asc' },
+    orderBy: { seq: 'desc' },
   });
 
   return (
@@ -44,7 +44,7 @@ export default async function ExternalExhibitionsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {exhibitions.map((ex) => (
-            <Link href={`/external-exhibitions/${ex.seq}`} key={ex.seq} className="block">
+            <Link href={`/external-exhibitions/${ex.id}`} key={ex.id} className="block">
               <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
                 <div className="h-48 bg-gray-100 relative">
                   {ex.coverThumb ? (

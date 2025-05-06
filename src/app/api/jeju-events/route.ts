@@ -38,7 +38,10 @@ export async function POST(request: NextRequest) {
 
 export async function GET(request: NextRequest) {
   try {
-    const events = await prisma.jejuEvent.findMany({ orderBy: { seq: 'asc' } });
+    const events = await prisma.jejuEvent.findMany({
+      where: { approved: true },
+      orderBy: { seq: 'desc' } 
+    });
     return NextResponse.json({ success: true, data: events });
   } catch (error) {
     console.error(error);

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import Image from 'next/image';
 
 export default async function JunoldaEventsPage() {
-  const events = await prisma.junoldaEvent.findMany({ where: { approved: true }, orderBy: { seq: 'asc' } });
+  const events = await prisma.externalEventJejunolda.findMany({ where: { approved: true }, orderBy: { id: 'desc' } });
 
   return (
     <div className="bg-white min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -31,7 +31,7 @@ export default async function JunoldaEventsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {events.map((e) => (
-            <Link href={`/junolda-events/${e.seq}`} key={e.seq} className="block">
+            <Link href={`/junolda-events/${e.id}`} key={e.id} className="block">
               <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
                 <div className="h-48 bg-gray-100 relative">
                   {/* 임시 이미지 플레이스홀더 */}
@@ -49,7 +49,7 @@ export default async function JunoldaEventsPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <span>
-                      {e.writeDate ? new Date(e.writeDate).toLocaleDateString('ko-KR', { 
+                      {e.createdAt ? new Date(e.createdAt).toLocaleDateString('ko-KR', { 
                         year: 'numeric', 
                         month: 'long', 
                         day: 'numeric' 

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import Image from 'next/image';
 
 export default async function JejuEventsPage() {
-  const events = await prisma.jejuEvent.findMany({ where: { approved: true }, orderBy: { seq: 'asc' } });
+  const events = await prisma.jejuEvent.findMany({ where: { approved: true }, orderBy: { seq: 'desc' } });
 
   return (
     <div className="bg-white min-h-screen py-8 px-4 sm:px-6 lg:px-8">

@@ -3,7 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 
 export default async function WelfareServicesPage() {
-  const services = await prisma.welfareService.findMany({ where: { approved: true }, orderBy: { seq: 'asc' } });
+  const services = await prisma.welfareService.findMany({ where: { approved: true }, orderBy: { seq: 'desc' } });
 
   return (
     <div className="bg-white min-h-screen py-8 px-4 sm:px-6 lg:px-8">

@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const services = await prisma.welfareService.findMany({ orderBy: { seq: 'asc' } });
+    const services = await prisma.welfareService.findMany({ orderBy: { seq: 'desc' } });
     return NextResponse.json({ success: true, data: services });
   } catch (error) {
     console.error(error);

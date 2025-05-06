@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
             prisma.externalEventJejunolda.findMany({
                 skip: skip,
                 take: pageSize,
-                orderBy: { startDate: 'desc' }, // 예시: 시작일 내림차순
+                orderBy: { apiSeq: 'desc' },
             }),
             prisma.externalEventJejunolda.count(),
         ]);

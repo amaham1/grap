@@ -1,43 +1,16 @@
 import {
-  Event,
-  SupportProgram,
   ExternalExhibition, // Added
   WelfareService,     // Added
   JejuEvent,          // Added
-  JunoldaEvent,       // Added
 } from '@prisma/client';
 import Image from 'next/image';
 import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
 
-// --- Data Fetching Functions ---
-
-async function getEvents(): Promise<Event[] | null> {
-  try {
-    // 최신 이벤트 6개만 가져오도록 limit 추가 (예시)
-    return await prisma.event.findMany({
-      where: { approved: true },
-      orderBy: { createdAt: 'desc' },
-      take: 6,
-    });
-  } catch (error) {
-    console.error('Error fetching events:', error);
-    return null;
-  }
-}
-
-async function getSupportPrograms(): Promise<SupportProgram[] | null> {
-  try {
-    // 예시: 최신 6개
-    return await prisma.supportProgram.findMany({
-      where: { approved: true },
-      orderBy: { createdAt: 'desc' },
-      take: 6,
-    });
-  } catch (error) {
-    console.error('Error fetching support programs:', error);
-    return null;
-  }
+// Helper function to strip HTML tags
+function stripHtml(html: string | null | undefined): string {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '');
 }
 
 async function getExternalExhibitions(): Promise<ExternalExhibition[] | null> {
@@ -45,7 +18,7 @@ async function getExternalExhibitions(): Promise<ExternalExhibition[] | null> {
     // 예시: 최신 6개
     return await prisma.externalExhibition.findMany({
       where: { approved: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { seq: 'desc' }, 
       take: 6,
     });
   } catch (error) {
@@ -59,8 +32,7 @@ async function getWelfareServices(): Promise<WelfareService[] | null> {
     // 예시: 최신 6개
     return await prisma.welfareService.findMany({
       where: { approved: true },
-      // welfare-services/page.tsx 에서는 seq 로 정렬했었으므로 맞춰줌 (필요시 변경)
-      orderBy: { seq: 'asc' }, 
+      orderBy: { seq: 'desc' }, 
       take: 6,
     });
   } catch (error) {
@@ -74,7 +46,7 @@ async function getJejuEvents(): Promise<JejuEvent[] | null> {
     // 예시: 최신 6개
     return await prisma.jejuEvent.findMany({
       where: { approved: true },
-      orderBy: { createdAt: 'desc' },
+      orderBy: { seq: 'desc' }, 
       take: 6,
     });
   } catch (error) {
@@ -82,22 +54,6 @@ async function getJejuEvents(): Promise<JejuEvent[] | null> {
     return null;
   }
 }
-
-async function getJunoldaEvents(): Promise<JunoldaEvent[] | null> {
-  try {
-    // 예시: 최신 6개
-    return await prisma.junoldaEvent.findMany({
-      where: { approved: true },
-      orderBy: { createdAt: 'desc' },
-      take: 6,
-    });
-  } catch (error) {
-    console.error('Error fetching Junolda events:', error);
-    return null;
-  }
-}
-
-// --- Helper Components ---
 
 // Generic Card Component for displaying list items
 function DataCard({ item, type }: { item: any, type: string }) {
@@ -110,6 +66,11 @@ function DataCard({ item, type }: { item: any, type: string }) {
   // 임시 이미지 URL (실제 데이터에 이미지가 있다면 그것을 사용)
   const imageUrl = `/images/${type}-placeholder.jpg`;
   
+  // 추가 정보 표시를 위한 변수 (exhibition 타입 전용)
+  let categoryDisplay: React.ReactNode | null = null;
+  let ownerDisplay: React.ReactNode | null = null;
+  let statusDisplay: React.ReactNode | null = null;
+
   // Determine display details based on type
   switch (type) {
     case 'event':
@@ -146,22 +107,54 @@ function DataCard({ item, type }: { item: any, type: string }) {
       description = item.intro;
       dateInfo = (
         <>
-          {item.startDate ? new Date(item.startDate).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : 'N/A'}
-          {item.endDate && ` ~ ${new Date(item.endDate).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}`}
+          {item.startDate ? new Date(item.startDate).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }) : '날짜 정보 없음'}
+          {item.endDate && item.startDate !== item.endDate && ` ~ ${new Date(item.endDate).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}`}
           {item.hour && ` (${item.hour})`}
         </>
       );
       linkHref = `/external-exhibitions/${item.id}`; // Use id
+
+      // categoryName 표시
+      if (item.categoryName) {
+        categoryDisplay = (
+          <span className="inline-block bg-purple-100 text-purple-800 text-xs font-medium px-2.5 py-0.5 rounded-full dark:bg-purple-900 dark:text-purple-300">
+            {item.categoryName}
+          </span>
+        );
+      }
+
+      // owner 표시
+      if (item.owner) {
+        ownerDisplay = <span className="text-gray-600">주최: {item.owner}</span>;
+      }
+
+      // stat (상태) 표시
+      if (item.stat) {
+        let statText = item.stat;
+        let statColorClasses = 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'; // 기본값
+        if (item.stat.toUpperCase() === 'ING' || item.stat.toUpperCase() === 'PLAN') {
+          statText = item.stat.toUpperCase() === 'ING' ? '진행중' : '예정';
+          statColorClasses = 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+        } else if (item.stat.toUpperCase() === 'END') {
+          statText = '종료';
+          statColorClasses = 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300';
+        }
+        statusDisplay = (
+          <span className={`inline-block text-xs font-medium px-2.5 py-0.5 rounded-full ${statColorClasses}`}>
+            {statText}
+          </span>
+        );
+      }
       break;
     case 'welfare':
       title = item.name;
-      description = item.contents;
+      description = stripHtml(item.contents); // HTML 태그 제거
       dateInfo = `지역: ${item.allLoc ? '전체' : ''}${item.jejuLoc ? ' 제주시' : ''}${item.seogwipoLoc ? ' 서귀포시' : ''}`;
       linkHref = `/welfare-services/${item.id}`; // Use id
       break;
     case 'jeju':
       title = item.title;
-      description = item.contents;
+      description = stripHtml(item.contents); // HTML 태그 제거
       dateInfo = `작성일: ${item.writeDate ? new Date(item.writeDate).toLocaleDateString('ko-KR') : 'N/A'}`;
       linkHref = `/jeju-events/${item.id}`; // Use id
       break;
@@ -176,23 +169,29 @@ function DataCard({ item, type }: { item: any, type: string }) {
   return (
     <div key={key} className="group">
       <Link href={linkHref} className="block">
-        <div className="relative overflow-hidden rounded-lg mb-3 bg-gray-50 aspect-square shadow-md group-hover:shadow-lg transition-shadow duration-300">
-          <div className="w-full h-full flex items-center justify-center text-gray-400">
-            {/* 실제 이미지가 있다면 Image 컴포넌트 사용 */}
-            {/* <Image 
-              src={imageUrl} 
-              alt={title} 
-              width={300} 
-              height={300} 
-              className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
-            /> */}
-            <div className="text-center p-4 w-full h-full">
-              <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-md group-hover:bg-gray-50 transition-colors duration-300">
-                <span className="text-sm">이미지 준비 중</span>
+        {/* Conditionally render the image container only if type is not 'welfare' and not 'jeju' */}
+        {type !== 'welfare' && type !== 'jeju' && (
+          <div className="relative overflow-hidden rounded-lg mb-3 bg-gray-50 aspect-square shadow-md group-hover:shadow-lg transition-shadow duration-300">
+            {type === 'exhibition' && item.coverThumb ? (
+              <Image 
+                src={item.coverThumb}
+                alt={title}
+                fill
+                className="object-cover w-full h-full transition-transform duration-300 group-hover:scale-105"
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              />
+            ) : (
+              // Default placeholder for other non-welfare types without specific images
+              <div className="w-full h-full flex items-center justify-center text-gray-400">
+                <div className="text-center p-4 w-full h-full">
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 rounded-md group-hover:bg-gray-50 transition-colors duration-300">
+                    <span className="text-sm">이미지 준비 중</span>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
-        </div>
+        )}
 
         <div className="px-1">
           <h3 className="text-base font-semibold text-gray-800 group-hover:text-primary transition-colors duration-300 mb-1 truncate">
@@ -204,8 +203,18 @@ function DataCard({ item, type }: { item: any, type: string }) {
 
           {/* 날짜 정보 */}
           {dateInfo && (
-            <div className="text-xs text-gray-600 mb-2">
+            <div className="text-xs text-gray-400 mt-1">
               {dateInfo}
+            </div>
+          )}
+          {/* Exhibition 추가 정보 표시 */} 
+          {type === 'exhibition' && (
+            <div className="mt-2 space-y-1">
+              <div className="flex items-center space-x-2">
+                {categoryDisplay}
+                {statusDisplay}
+              </div>
+              {ownerDisplay && <div className="text-xs text-gray-500">{ownerDisplay}</div>}
             </div>
           )}
         </div>
@@ -270,13 +279,10 @@ import { CalendarIcon, MapPinIcon, UserGroupIcon, ExclamationTriangleIcon, Docum
 
 export default async function HomePage() {
   // Fetch data for all sections
-  const [events, supportPrograms, externalExhibitions, welfareServices, jejuEvents, junoldaEvents] = await Promise.all([
-    getEvents(),
-    getSupportPrograms(),
+  const [externalExhibitions, welfareServices, jejuEvents] = await Promise.all([
     getExternalExhibitions(),
     getWelfareServices(),
     getJejuEvents(),
-    getJunoldaEvents()
   ]);
 
   return (
@@ -313,7 +319,6 @@ export default async function HomePage() {
           <DataSection id="section-exhibition" title="전시회" data={externalExhibitions} type="exhibition" color="purple" />
           <DataSection id="section-welfare" title="복지 서비스" data={welfareServices} type="welfare" color="indigo" />
           <DataSection id="section-jeju" title="제주 행사" data={jejuEvents} type="jeju" color="pink" />
-          <DataSection id="section-junolda" title="전시문화 행사" data={junoldaEvents} type="junolda" color="yellow" />
         </div>
       </div>
     </div>

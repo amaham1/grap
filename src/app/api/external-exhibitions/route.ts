@@ -15,8 +15,10 @@ interface ApiItem {
   categoryName?: string;
   cover?: string;
   coverThumb?: string;
-  startDate?: string;
-  endDate?: string;
+  startDate?: string; // 기존 필드 (대체 값으로 사용 가능)
+  endDate?: string;   // 기존 필드 (대체 값으로 사용 가능)
+  start?: string;     // 외부 API의 'start' 키
+  end?: string;       // 외부 API의 'end' 키
   hour?: string;
   pay?: string;
   locs?: string;
@@ -140,8 +142,8 @@ export async function POST(request: NextRequest) {
                 categoryName: item.categoryName,
                 cover: item.cover,
                 coverThumb: item.coverThumb,
-                startDate: parseDate(item.startDate),
-                endDate: parseDate(item.endDate),
+                startDate: parseDate(item.start || item.startDate), // item.start 우선, 없으면 item.startDate 사용
+                endDate: parseDate(item.end || item.endDate),       // item.end 우선, 없으면 item.endDate 사용
                 hour: item.hour,
                 pay: item.pay,
                 locs: item.locs,
@@ -161,8 +163,8 @@ export async function POST(request: NextRequest) {
                 categoryName: item.categoryName,
                 cover: item.cover,
                 coverThumb: item.coverThumb,
-                startDate: parseDate(item.startDate),
-                endDate: parseDate(item.endDate),
+                startDate: parseDate(item.start || item.startDate), // item.start 우선, 없으면 item.startDate 사용
+                endDate: parseDate(item.end || item.endDate),       // item.end 우선, 없으면 item.endDate 사용
                 hour: item.hour,
                 pay: item.pay,
                 locs: item.locs,
@@ -248,7 +250,7 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
   const approvedParam = searchParams.get('approved');
   const where = approvedParam !== null ? { approved: approvedParam === 'true' } : {};
-  const data = await prisma.externalExhibition.findMany({ where, orderBy: { seq: 'asc' } });
+  const data = await prisma.externalExhibition.findMany({ where, orderBy: { seq: 'desc' } });
   return NextResponse.json({ success: true, data });
 }
 
