@@ -57,7 +57,7 @@ export default async function WelfareServiceDetail({ params: { id: idString } }:
             {service.support && (
               <div className="mb-6 bg-gray-50 p-4 rounded-md border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">지원 내용</h3>
-                <p className="text-gray-700">{service.support}</p>
+                <p className="text-gray-700 whitespace-pre-line">{service.support.replace(/<br\s*\/?>/gi, '\n').replace(/&nbsp;/g, ' ').replace(/<[^>]*>/g, '')}</p>
               </div>
             )}
             
@@ -65,7 +65,7 @@ export default async function WelfareServiceDetail({ params: { id: idString } }:
             {service.application && (
               <div className="mb-6 bg-gray-50 p-4 rounded-md border border-gray-200">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">신청 방법</h3>
-                <p className="text-gray-700">{service.application}</p>
+                <p className="text-gray-700 whitespace-pre-line">{service.application.replace(/<br\s*\/?>/gi, '\n').replace(/&nbsp;/g, ' ').replace(/<[^>]*>/g, '')}</p>
               </div>
             )}
             
@@ -73,7 +73,12 @@ export default async function WelfareServiceDetail({ params: { id: idString } }:
             {service.contents ? (
               <div className="prose max-w-none">
                 <h3 className="text-lg font-semibold text-gray-800 mb-2">상세 내용</h3>
-                <div dangerouslySetInnerHTML={{ __html: service.contents }} />
+                {(() => {
+                  const textWithLineBreaks = service.contents.replace(/<br\s*\/?>/gi, '\n');
+                  const textWithSpaces = textWithLineBreaks.replace(/&nbsp;/g, ' ');
+                  const plainText = textWithSpaces.replace(/<[^>]*>/g, '');
+                  return <div className="whitespace-pre-line">{plainText}</div>;
+                })()}
               </div>
             ) : (
               <div className="text-center py-10 text-gray-500">

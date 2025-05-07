@@ -31,6 +31,12 @@ module.exports = {
       fontFamily: {
         sans: ['Pretendard', 'sans-serif'],
       },
+      maxWidth: {
+        '8xl': '1580px', 
+      },
+      screens: {
+        '3xl': '1920px', 
+      },
     },
   },
   plugins: [],

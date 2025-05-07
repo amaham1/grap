@@ -1,9 +1,35 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
+import PageSizeSelector from '@/components/PageSizeSelector';
 
-export default async function WelfareServicesPage() {
-  const services = await prisma.welfareService.findMany({ where: { approved: true }, orderBy: { seq: 'desc' } });
+const DEFAULT_PAGE_SIZE = 10;
+const AVAILABLE_SIZES = [10, 30, 50];
+
+interface WelfarePageProps {
+  searchParams?: {
+    page?: string;
+    size?: string;
+  };
+}
+
+export default async function WelfareServicesPage({ searchParams }: WelfarePageProps) {
+  const currentPage = parseInt(searchParams?.page || '1', 10);
+  const itemsPerPage = parseInt(searchParams?.size || DEFAULT_PAGE_SIZE.toString(), 10);
+  const validatedItemsPerPage = AVAILABLE_SIZES.includes(itemsPerPage) ? itemsPerPage : DEFAULT_PAGE_SIZE;
+
+  const totalServices = await prisma.welfareService.count({
+    where: { approved: true },
+  });
+
+  const totalPages = Math.ceil(totalServices / validatedItemsPerPage);
+
+  const services = await prisma.welfareService.findMany({
+    where: { approved: true },
+    orderBy: { seq: 'desc' },
+    skip: (currentPage - 1) * validatedItemsPerPage,
+    take: validatedItemsPerPage,
+  });
 
   return (
     <div className="bg-white min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -13,10 +39,12 @@ export default async function WelfareServicesPage() {
           <div className="bg-[#e64c66] w-1 h-7 mr-3"></div>
           <h1 className="text-3xl font-bold text-[#333]">복지 서비스</h1>
         </div>
-        <p className="mt-2 text-gray-500">지역 주민들을 위한 다양한 복지 서비스 정보를 확인하세요.</p>
+        <p className="mt-2 text-gray-500">지역 주민들을 위한 다양한 복지 서비스 정보를 확인하세요. (총 {totalServices}개)</p>
       </div>
-      
-      {services.length === 0 ? (
+
+      <PageSizeSelector defaultSize={DEFAULT_PAGE_SIZE} availableSizes={AVAILABLE_SIZES} />
+
+      {totalServices === 0 ? (
         <div className="text-center py-12 border rounded-lg shadow-sm">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
@@ -28,10 +56,17 @@ export default async function WelfareServicesPage() {
           <p className="text-gray-500 font-medium">등록된 복지 서비스가 없습니다.</p>
           <p className="text-gray-400 text-sm mt-1">나중에 다시 확인해 주세요.</p>
         </div>
+      ) : services.length === 0 && currentPage > 1 ? (
+        <div className="text-center py-12 border rounded-lg shadow-sm">
+          <p className="text-gray-500 font-medium">해당 페이지에는 복지 서비스가 없습니다.</p>
+          <Link href={`/welfare-services?page=1&size=${validatedItemsPerPage}`} className="mt-4 inline-block px-4 py-2 bg-[#e64c66] text-white rounded hover:bg-[#d33a52] transition-colors">
+            첫 페이지로 돌아가기
+          </Link>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {services.map((s) => (
-            <Link href={`/welfare-services/${s.seq}`} key={s.seq} className="block">
+            <Link href={`/welfare-services/${s.id}`} key={s.id} className="block">
               <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
                 <div className="h-48 bg-gray-100 relative">
                   {/* 임시 이미지 플레이스홀더 */}
@@ -72,24 +107,51 @@ export default async function WelfareServicesPage() {
         </div>
       )}
       
-      {/* 서울시청 스타일 페이지네이션 */}
-      {services.length > 0 && (
+      {/* 서울시청 스타일 페이지네이션 */} 
+      {totalServices > 0 && (
         <div className="mt-10 flex justify-center">
           <nav className="flex items-center">
-            <button className="mr-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
+            {currentPage > 1 ? (
+              <Link href={`/welfare-services?page=${currentPage - 1}&size=${validatedItemsPerPage}`} className="mr-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+            ) : (
+              <span className="mr-2 p-2 rounded border border-gray-200 text-gray-300 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </span>
+            )}
             <div className="flex space-x-1">
-              <button className="w-10 h-10 flex items-center justify-center rounded bg-[#e64c66] text-white">1</button>
-              {/* 추가 페이지 버튼들은 실제 페이지네이션 구현 시 동적으로 생성하세요 */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
+                <Link 
+                  key={pageNumber} 
+                  href={`/welfare-services?page=${pageNumber}&size=${validatedItemsPerPage}`}
+                  className={`w-10 h-10 flex items-center justify-center rounded transition-colors 
+                    ${pageNumber === currentPage 
+                      ? 'bg-[#e64c66] text-white cursor-default'
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}`}
+                  aria-current={pageNumber === currentPage ? 'page' : undefined}
+                >
+                  {pageNumber}
+                </Link>
+              ))}
             </div>
-            <button className="ml-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+            {currentPage < totalPages ? (
+              <Link href={`/welfare-services?page=${currentPage + 1}&size=${validatedItemsPerPage}`} className="ml-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            ) : (
+              <span className="ml-2 p-2 rounded border border-gray-200 text-gray-300 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            )}
           </nav>
         </div>
       )}

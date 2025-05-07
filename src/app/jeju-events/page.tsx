@@ -1,9 +1,35 @@
-import Link from 'next/link';
 import { prisma } from '@/lib/prisma';
+import Link from 'next/link';
 import Image from 'next/image';
+import PageSizeSelector from '@/components/PageSizeSelector';
 
-export default async function JejuEventsPage() {
-  const events = await prisma.jejuEvent.findMany({ where: { approved: true }, orderBy: { seq: 'desc' } });
+interface PageProps {
+  searchParams?: {
+    page?: string;
+    size?: string;
+  };
+}
+
+const DEFAULT_PAGE_SIZE = 10;
+const AVAILABLE_SIZES = [10, 30, 50];
+
+export default async function JejuEventsPage({ searchParams }: PageProps) {
+  const currentPage = parseInt(searchParams?.page || '1', 10);
+  const itemsPerPage = parseInt(searchParams?.size || DEFAULT_PAGE_SIZE.toString(), 10);
+  const validatedItemsPerPage = AVAILABLE_SIZES.includes(itemsPerPage) ? itemsPerPage : DEFAULT_PAGE_SIZE;
+
+  const totalEvents = await prisma.jejuEvent.count({
+    where: { approved: true },
+  });
+
+  const events = await prisma.jejuEvent.findMany({
+    where: { approved: true },
+    orderBy: { seq: 'desc' },
+    skip: (currentPage - 1) * validatedItemsPerPage,
+    take: validatedItemsPerPage,
+  });
+
+  const totalPages = Math.ceil(totalEvents / validatedItemsPerPage);
 
   return (
     <div className="bg-white min-h-screen py-8 px-4 sm:px-6 lg:px-8">
@@ -16,7 +42,9 @@ export default async function JejuEventsPage() {
         <p className="mt-2 text-gray-500">제주도에서 열리는 다양한 행사 및 축제 정보를 확인하세요.</p>
       </div>
       
-      {events.length === 0 ? (
+      <PageSizeSelector defaultSize={DEFAULT_PAGE_SIZE} availableSizes={AVAILABLE_SIZES} />
+
+      {totalEvents === 0 ? (
         <div className="text-center py-12 border rounded-lg shadow-sm">
           <div className="flex justify-center mb-4">
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
@@ -28,10 +56,17 @@ export default async function JejuEventsPage() {
           <p className="text-gray-500 font-medium">등록된 제주 행사가 없습니다.</p>
           <p className="text-gray-400 text-sm mt-1">나중에 다시 확인해 주세요.</p>
         </div>
+      ) : events.length === 0 && currentPage > 1 ? (
+        <div className="text-center py-12 border rounded-lg shadow-sm">
+           <p className="text-gray-500 font-medium">해당 페이지에는 제주 행사가 없습니다.</p>
+           <Link href={`/jeju-events?page=1&size=${validatedItemsPerPage}`} className="mt-4 inline-block px-4 py-2 bg-[#007c51] text-white rounded hover:bg-[#005c3c] transition-colors">
+             첫 페이지로 돌아가기
+           </Link>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {events.map((e) => (
-            <Link href={`/jeju-events/${e.id}`} key={e.id} className="block">
+          {events.map((event) => (
+            <Link href={`/jeju-events/${event.id}`} key={event.id} className="block">
               <div className="border border-gray-200 rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-all">
                 <div className="h-48 bg-gray-100 relative">
                   {/* 임시 이미지 플레이스홀더 */}
@@ -44,13 +79,13 @@ export default async function JejuEventsPage() {
                 </div>
                 <div className="p-4">
                   <div className="text-xs inline-block px-2 py-1 rounded-full bg-[#e7f7f1] text-[#007c51] mb-2">제주행사</div>
-                  <h2 className="text-lg font-semibold text-[#333] mb-2 line-clamp-2 h-14">{e.title}</h2>
+                  <h2 className="text-lg font-semibold text-[#333] mb-2 line-clamp-2 h-14">{event.title}</h2>
                   <div className="flex items-center text-gray-500 text-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <span>
-                      {new Date(e.writeDate).toLocaleDateString('ko-KR', { 
+                      {new Date(event.writeDate).toLocaleDateString('ko-KR', { 
                         year: 'numeric', 
                         month: 'long', 
                         day: 'numeric' 
@@ -72,24 +107,50 @@ export default async function JejuEventsPage() {
         </div>
       )}
       
-      {/* 서울시청 스타일 페이지네이션 */}
-      {events.length > 0 && (
+      {totalEvents > 0 && (
         <div className="mt-10 flex justify-center">
           <nav className="flex items-center">
-            <button className="mr-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
+            {currentPage > 1 ? (
+              <Link href={`/jeju-events?page=${currentPage - 1}&size=${validatedItemsPerPage}`} className="mr-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </Link>
+            ) : (
+              <span className="mr-2 p-2 rounded border border-gray-200 text-gray-300 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </span>
+            )}
             <div className="flex space-x-1">
-              <button className="w-10 h-10 flex items-center justify-center rounded bg-[#007c51] text-white">1</button>
-              {/* 추가 페이지 버튼들은 실제 페이지네이션 구현 시 동적으로 생성하세요 */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
+                <Link 
+                  key={pageNumber} 
+                  href={`/jeju-events?page=${pageNumber}&size=${validatedItemsPerPage}`}
+                  className={`w-10 h-10 flex items-center justify-center rounded transition-colors 
+                    ${pageNumber === currentPage 
+                      ? 'bg-[#ff9f00] text-white cursor-default' 
+                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}`}
+                  aria-current={pageNumber === currentPage ? 'page' : undefined}
+                >
+                  {pageNumber}
+                </Link>
+              ))}
             </div>
-            <button className="ml-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
+            {currentPage < totalPages ? (
+              <Link href={`/jeju-events?page=${currentPage + 1}&size=${validatedItemsPerPage}`} className="ml-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            ) : (
+              <span className="ml-2 p-2 rounded border border-gray-200 text-gray-300 cursor-not-allowed">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </span>
+            )}
           </nav>
         </div>
       )}

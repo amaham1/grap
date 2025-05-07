@@ -307,7 +307,7 @@ export default async function HomePage() {
               <a href="#section-exhibition" className="text-gray-500 hover:text-primary border-b-2 border-transparent hover:border-primary px-1 py-2 text-sm font-medium whitespace-nowrap transition-colors">전시회</a>
               <a href="#section-welfare" className="text-gray-500 hover:text-primary border-b-2 border-transparent hover:border-primary px-1 py-2 text-sm font-medium whitespace-nowrap transition-colors">복지 서비스</a>
               <a href="#section-jeju" className="text-gray-500 hover:text-primary border-b-2 border-transparent hover:border-primary px-1 py-2 text-sm font-medium whitespace-nowrap transition-colors">제주 행사</a>
-              <a href="#section-junolda" className="text-gray-500 hover:text-primary border-b-2 border-transparent hover:border-primary px-1 py-2 text-sm font-medium whitespace-nowrap transition-colors">전시문화 행사</a>
+              {/* <a href="#section-junolda" className="text-gray-500 hover:text-primary border-b-2 border-transparent hover:border-primary px-1 py-2 text-sm font-medium whitespace-nowrap transition-colors">전시문화 행사</a> */}
             </div>
           </div>
         </div>
