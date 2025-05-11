@@ -5,9 +5,8 @@ const nextConfig = {
 
 module.exports = {
   ...nextConfig,
-  basePath: '/alljeju',
   env: {
-    NEXT_PUBLIC_BASE_PATH: '/alljeju'
+    NEXT_PUBLIC_BASE_PATH: ''
   },
   images: {
     remotePatterns: [

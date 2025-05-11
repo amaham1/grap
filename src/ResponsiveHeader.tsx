@@ -6,10 +6,10 @@ import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const navLinks = [
   { href: "/", label: "홈" },
-  { href: "/external-exhibitions", label: "외부 전시회" },
-  { href: "/welfare-services", label: "복지 서비스" },
-  { href: "/jeju-events", label: "제주 행사" },
-  // { href: "/junolda-events", label: "전시문화 행사" },
+  { href: "/alljeju", label: "제주 정보" },
+  { href: "/alljeju/external-exhibitions", label: "외부 전시회" },
+  { href: "/alljeju/welfare-services", label: "복지 서비스" },
+  { href: "/alljeju/jeju-events", label: "제주 행사" },
 ];
 
 export default function ResponsiveHeader() {
