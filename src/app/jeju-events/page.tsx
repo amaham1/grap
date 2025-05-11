@@ -41,7 +41,7 @@ export default async function JejuEventsPage({ searchParams }: PageProps) {
         </div>
         <p className="mt-2 text-gray-500">제주도에서 열리는 다양한 행사 및 축제 정보를 확인하세요.</p>
       </div>
-      
+
       <PageSizeSelector defaultSize={DEFAULT_PAGE_SIZE} availableSizes={AVAILABLE_SIZES} />
 
       {totalEvents === 0 ? (
@@ -85,10 +85,10 @@ export default async function JejuEventsPage({ searchParams }: PageProps) {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
                     <span>
-                      {new Date(event.writeDate).toLocaleDateString('ko-KR', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                      {new Date(event.writeDate).toLocaleDateString('ko-KR', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
                       })}
                     </span>
                   </div>
@@ -106,7 +106,7 @@ export default async function JejuEventsPage({ searchParams }: PageProps) {
           ))}
         </div>
       )}
-      
+
       {totalEvents > 0 && (
         <div className="mt-10 flex justify-center">
           <nav className="flex items-center">
@@ -124,19 +124,70 @@ export default async function JejuEventsPage({ searchParams }: PageProps) {
               </span>
             )}
             <div className="flex space-x-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
-                <Link 
-                  key={pageNumber} 
-                  href={`/jeju-events?page=${pageNumber}&size=${validatedItemsPerPage}`}
-                  className={`w-10 h-10 flex items-center justify-center rounded transition-colors 
-                    ${pageNumber === currentPage 
-                      ? 'bg-[#ff9f00] text-white cursor-default' 
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}`}
-                  aria-current={pageNumber === currentPage ? 'page' : undefined}
-                >
-                  {pageNumber}
-                </Link>
-              ))}
+              {(() => {
+                // 페이지 번호 계산 로직
+                const visiblePageNumbers = [];
+                const maxVisiblePages = 5; // 최대 표시할 페이지 수
+
+                // 첫 페이지는 항상 표시
+                if (1 < currentPage - Math.floor(maxVisiblePages / 2)) {
+                  visiblePageNumbers.push(1);
+                  // 첫 페이지와 현재 페이지 사이에 간격이 있으면 생략 표시
+                  if (currentPage - Math.floor(maxVisiblePages / 2) > 2) {
+                    visiblePageNumbers.push('ellipsis1');
+                  }
+                }
+
+                // 현재 페이지 주변의 페이지 계산
+                const startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                // 실제 표시할 페이지 범위 조정
+                const adjustedStartPage = Math.max(1, endPage - maxVisiblePages + 1);
+
+                // 현재 페이지 주변의 페이지 추가
+                for (let i = adjustedStartPage; i <= endPage; i++) {
+                  visiblePageNumbers.push(i);
+                }
+
+                // 마지막 페이지는 항상 표시
+                if (endPage < totalPages) {
+                  // 현재 페이지와 마지막 페이지 사이에 간격이 있으면 생략 표시
+                  if (endPage < totalPages - 1) {
+                    visiblePageNumbers.push('ellipsis2');
+                  }
+                  visiblePageNumbers.push(totalPages);
+                }
+
+                return visiblePageNumbers.map((pageNumber, index) => {
+                  // 생략 표시(...)
+                  if (pageNumber === 'ellipsis1' || pageNumber === 'ellipsis2') {
+                    return (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="w-10 h-10 flex items-center justify-center text-gray-500"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+
+                  // 페이지 번호 링크
+                  return (
+                    <Link
+                      key={pageNumber}
+                      href={`/jeju-events?page=${pageNumber}&size=${validatedItemsPerPage}`}
+                      className={`w-10 h-10 flex items-center justify-center rounded transition-colors
+                        ${pageNumber === currentPage
+                          ? 'bg-[#ff9f00] text-white cursor-default'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}`}
+                      aria-current={pageNumber === currentPage ? 'page' : undefined}
+                    >
+                      {pageNumber}
+                    </Link>
+                  );
+                });
+              })()}
             </div>
             {currentPage < totalPages ? (
               <Link href={`/jeju-events?page=${currentPage + 1}&size=${validatedItemsPerPage}`} className="ml-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">

@@ -5,8 +5,7 @@ import { useState } from 'react';
 import { Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 
 const navLinks = [
-  { href: "/", label: "홈" },
-  { href: "/alljeju", label: "제주 정보" },
+  { href: "/alljeju", label: "홈" },
   { href: "/alljeju/external-exhibitions", label: "외부 전시회" },
   { href: "/alljeju/welfare-services", label: "복지 서비스" },
   { href: "/alljeju/jeju-events", label: "제주 행사" },

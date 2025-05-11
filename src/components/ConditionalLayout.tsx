@@ -10,9 +10,9 @@ interface ConditionalLayoutProps {
 
 export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname();
-  const isRootOrAllJejuPath = pathname === '/' || pathname === '/alljeju';
+  const isRootPath = pathname === '/';
 
-  if (isRootOrAllJejuPath) {
+  if (isRootPath) {
     return <main className="w-full">{children}</main>;
   }
 

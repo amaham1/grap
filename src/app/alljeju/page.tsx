@@ -250,7 +250,6 @@ export default async function AllJejuPage() {
 
   return (
     <div className="bg-gray-50 min-h-screen">
-      <AllJejuHeader />
 
       {/* 상단 배너 영역 */}
       <div className="bg-gradient-to-r from-pink-50 to-blue-50 border-b border-gray-200">

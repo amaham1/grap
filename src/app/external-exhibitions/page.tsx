@@ -41,7 +41,7 @@ export default async function ExternalExhibitionsPage({ searchParams }: PageProp
         </div>
         <p className="mt-2 text-gray-500">다양한 외부 전시회 정보를 확인하고 참여해보세요.</p>
       </div>
-      
+
       <PageSizeSelector defaultSize={DEFAULT_PAGE_SIZE} availableSizes={AVAILABLE_SIZES} />
 
       {totalExhibitions === 0 ? (
@@ -91,7 +91,7 @@ export default async function ExternalExhibitionsPage({ searchParams }: PageProp
                     )}
                   </div>
                   <h2 className="text-lg font-semibold text-[#333] mb-3 line-clamp-2 h-14">{exhibition.title}</h2>
-                  
+
                   {(exhibition.startDate || exhibition.endDate) && (
                     <div className="flex items-center text-gray-500 text-sm mb-2">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -104,7 +104,7 @@ export default async function ExternalExhibitionsPage({ searchParams }: PageProp
                       </span>
                     </div>
                   )}
-                  
+
                   {(exhibition.locNames || exhibition.locs) && (
                     <div className="flex items-center text-gray-500 text-sm">
                       <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -128,7 +128,7 @@ export default async function ExternalExhibitionsPage({ searchParams }: PageProp
           ))}
         </div>
       )}
-      
+
       {totalExhibitions > 0 && (
         <div className="mt-10 flex justify-center">
           <nav className="flex items-center">
@@ -146,19 +146,70 @@ export default async function ExternalExhibitionsPage({ searchParams }: PageProp
               </span>
             )}
             <div className="flex space-x-1">
-              {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNumber) => (
-                <Link 
-                  key={pageNumber} 
-                  href={`/external-exhibitions?page=${pageNumber}&size=${validatedItemsPerPage}`}
-                  className={`w-10 h-10 flex items-center justify-center rounded transition-colors 
-                    ${pageNumber === currentPage 
-                      ? 'bg-[#8046cc] text-white cursor-default' 
-                      : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}`}
-                  aria-current={pageNumber === currentPage ? 'page' : undefined}
-                >
-                  {pageNumber}
-                </Link>
-              ))}
+              {(() => {
+                // 페이지 번호 계산 로직
+                const visiblePageNumbers = [];
+                const maxVisiblePages = 5; // 최대 표시할 페이지 수
+
+                // 첫 페이지는 항상 표시
+                if (1 < currentPage - Math.floor(maxVisiblePages / 2)) {
+                  visiblePageNumbers.push(1);
+                  // 첫 페이지와 현재 페이지 사이에 간격이 있으면 생략 표시
+                  if (currentPage - Math.floor(maxVisiblePages / 2) > 2) {
+                    visiblePageNumbers.push('ellipsis1');
+                  }
+                }
+
+                // 현재 페이지 주변의 페이지 계산
+                const startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                const endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                // 실제 표시할 페이지 범위 조정
+                const adjustedStartPage = Math.max(1, endPage - maxVisiblePages + 1);
+
+                // 현재 페이지 주변의 페이지 추가
+                for (let i = adjustedStartPage; i <= endPage; i++) {
+                  visiblePageNumbers.push(i);
+                }
+
+                // 마지막 페이지는 항상 표시
+                if (endPage < totalPages) {
+                  // 현재 페이지와 마지막 페이지 사이에 간격이 있으면 생략 표시
+                  if (endPage < totalPages - 1) {
+                    visiblePageNumbers.push('ellipsis2');
+                  }
+                  visiblePageNumbers.push(totalPages);
+                }
+
+                return visiblePageNumbers.map((pageNumber, index) => {
+                  // 생략 표시(...)
+                  if (pageNumber === 'ellipsis1' || pageNumber === 'ellipsis2') {
+                    return (
+                      <span
+                        key={`ellipsis-${index}`}
+                        className="w-10 h-10 flex items-center justify-center text-gray-500"
+                      >
+                        ...
+                      </span>
+                    );
+                  }
+
+                  // 페이지 번호 링크
+                  return (
+                    <Link
+                      key={pageNumber}
+                      href={`/external-exhibitions?page=${pageNumber}&size=${validatedItemsPerPage}`}
+                      className={`w-10 h-10 flex items-center justify-center rounded transition-colors
+                        ${pageNumber === currentPage
+                          ? 'bg-[#8046cc] text-white cursor-default'
+                          : 'bg-white text-gray-700 hover:bg-gray-100 border border-gray-300'}`}
+                      aria-current={pageNumber === currentPage ? 'page' : undefined}
+                    >
+                      {pageNumber}
+                    </Link>
+                  );
+                });
+              })()}
             </div>
             {currentPage < totalPages ? (
               <Link href={`/external-exhibitions?page=${currentPage + 1}&size=${validatedItemsPerPage}`} className="ml-2 p-2 rounded border border-gray-300 text-gray-500 hover:bg-gray-50 transition-colors">
