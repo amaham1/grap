@@ -2,6 +2,77 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import Image from 'next/image';
 import PageSizeSelector from '@/components/PageSizeSelector';
+import crypto from 'crypto';
+
+const DEFAULT_PAGE_SIZE = 10;
+const AVAILABLE_SIZES = [10, 30, 50];
+
+// 복호화 함수
+const decrypt = (text: string): string => {
+  try {
+    const key = process.env.ENCRYPTION_KEY || 'your-32-character-encryption-key-here';
+    const iv = process.env.ENCRYPTION_IV || 'your-16-char-iv';
+    
+    const keyBuffer = Buffer.alloc(32, key, 'utf8');
+    const ivBuffer = Buffer.alloc(16, iv, 'utf8');
+    
+    const decipher = crypto.createDecipheriv('aes-256-cbc', keyBuffer, ivBuffer);
+    let decrypted = decipher.update(text, 'base64', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  } catch (error) {
+    console.error('복호화 오류:', error);
+    return text; // 복호화 실패 시 원본 텍스트 반환
+  }
+};
+
+// base64 디코딩 함수
+const decodeBase64 = (str: string): string => {
+  if (!str) return str;
+  
+  try {
+    if (typeof str !== 'string') return str;
+    
+    // base64 문자열 패턴 확인 (A-Z, a-z, 0-9, +, /, =)
+    const base64Regex = /^[A-Za-z0-9+/=]+$/;
+    if (!base64Regex.test(str)) return str;
+    
+    // 길이가 4의 배수인지 확인 (base64 문자열의 특징)
+    if (str.length % 4 !== 0) return str;
+    
+    // 디코딩 시도
+    const decoded = Buffer.from(str, 'base64').toString('utf8');
+    
+    // 디코딩된 결과가 유효한지 확인 (비어있지 않은 문자열인지)
+    return decoded || str;
+  } catch (error) {
+    console.error('Base64 디코딩 오류:', error);
+    return str;
+  }
+};
+
+// 필드 복호화 함수
+const decryptField = (value: any): string => {
+  if (value === null || value === undefined) return '';
+  if (typeof value !== 'string') return String(value);
+  
+  // base64 디코딩 시도
+  const decoded = decodeBase64(value);
+  
+  // 디코딩된 결과가 원본과 다르면 디코딩 성공
+  if (decoded !== value) {
+    return decoded;
+  }
+  
+  // base64 디코딩이 실패하면 복호화 시도
+  try {
+    return decrypt(value);
+  } catch (error) {
+    console.error('복호화 실패:', error);
+    return value;
+  }
+};
 
 interface PageProps {
   searchParams?: {
@@ -10,26 +81,34 @@ interface PageProps {
   };
 }
 
-const DEFAULT_PAGE_SIZE = 10;
-const AVAILABLE_SIZES = [10, 30, 50];
-
 export default async function JejuEventsPage({ searchParams }: PageProps) {
   const currentPage = parseInt(searchParams?.page || '1', 10);
   const itemsPerPage = parseInt(searchParams?.size || DEFAULT_PAGE_SIZE.toString(), 10);
   const validatedItemsPerPage = AVAILABLE_SIZES.includes(itemsPerPage) ? itemsPerPage : DEFAULT_PAGE_SIZE;
+  const offset = (currentPage - 1) * validatedItemsPerPage;
 
-  const totalEvents = await prisma.jejuEvent.count({
-    where: { approved: true },
-  });
-
-  const events = await prisma.jejuEvent.findMany({
-    where: { approved: true },
-    orderBy: { seq: 'desc' },
-    skip: (currentPage - 1) * validatedItemsPerPage,
-    take: validatedItemsPerPage,
-  });
-
+  // 총 이벤트 수 가져오기 (실제 테이블 이름인 jeju_event 사용)
+  const totalEventsResult = await prisma.$queryRaw`
+    SELECT COUNT(*) as count FROM jeju_event WHERE approved = TRUE;
+  `;
+  const totalEvents = Number(totalEventsResult?.[0]?.count) || 0;
   const totalPages = Math.ceil(totalEvents / validatedItemsPerPage);
+
+  // Raw 쿼리로 데이터 가져오기 (타입 검증 우회)
+  const eventsRaw = await prisma.$queryRaw`
+    SELECT * FROM jeju_event 
+    WHERE approved = TRUE 
+    ORDER BY seq DESC 
+    LIMIT ${validatedItemsPerPage} OFFSET ${offset};
+  `;
+
+  // 복호화 처리
+  const events = (eventsRaw as any[]).map(event => ({
+    ...event,
+    title: decryptField(event.title),
+    contents: decryptField(event.contents),
+    writer: decryptField(event.writer),
+  }));
 
   return (
     <div className="bg-white min-h-screen py-8 px-4 sm:px-6 lg:px-8">
